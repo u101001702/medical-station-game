@@ -1,0 +1,384 @@
+<title>急救站佈局遊戲審核</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：像一份勾選式設計規格書，左側章節、右側逐項決議；藍圖藍＋檢傷四色當語意色 */
+:root{
+  --paper:#f2f5f7; --card:#ffffff; --ink:#15222c; --muted:#5b6b78; --line:#cfd8df;
+  --accent:#1d5d8a; --accent-soft:#e3eef6; --rec:#0f7a5a; --rec-soft:#e2f3ec;
+  --red:#c2362c; --yellow:#d99a12; --green:#2c8a4b; --black:#2a2f33;
+  --warn-soft:#fff4dc; --warn:#8a5a00;
+  --f-display:"LXGW WenKai TC","Noto Serif TC",serif;
+  --f-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0f171d; --card:#16212a; --ink:#e3ebf1; --muted:#9aabb8; --line:#2b3a46;
+  --accent:#6fb0e0; --accent-soft:#1a2f40; --rec:#5fd1a6; --rec-soft:#14302a;
+  --red:#ef6b60; --yellow:#f2bd4a; --green:#5cc47e; --black:#9aa3aa;
+  --warn-soft:#3a2e12; --warn:#f2c46b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f171d; --card:#16212a; --ink:#e3ebf1; --muted:#9aabb8; --line:#2b3a46;
+  --accent:#6fb0e0; --accent-soft:#1a2f40; --rec:#5fd1a6; --rec-soft:#14302a;
+  --red:#ef6b60; --yellow:#f2bd4a; --green:#5cc47e; --black:#9aa3aa;
+  --warn-soft:#3a2e12; --warn:#f2c46b; color-scheme:dark}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+.topin{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.topin h1{font-family:var(--f-display);font-size:20px;margin:0;font-weight:700}
+.prog{flex:1;min-width:180px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--rec);width:0;transition:width .3s}
+.save{font-size:12px;color:var(--muted);min-width:7em;text-align:right}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:6px;padding:4px 12px;font-size:13px}
+.btn:hover{background:var(--accent-soft)}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+.intro{padding-block:28px 8px}
+.intro h2{font-family:var(--f-display);font-size:30px;line-height:1.3;margin:0 0 8px;text-wrap:balance}
+.intro p{margin:0 0 10px;max-width:62ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 10px;font-size:12px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.g{border-color:var(--accent);color:var(--accent)}
+.chip.a{border-color:var(--warn);color:var(--warn)}
+.chip.d{background:var(--rec-soft);border-color:var(--rec);color:var(--rec)}
+
+nav.toc{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 8px}
+nav.toc a{font-size:13px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:2px 10px;background:var(--card)}
+nav.toc a span{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:4px}
+
+section.sec{margin-top:36px}
+section.sec>h3{font-family:var(--f-display);font-size:24px;margin:0 0 4px;display:flex;align-items:baseline;gap:10px}
+section.sec>h3 b{font-family:var(--f-mono);font-size:14px;color:var(--accent);font-weight:500}
+section.sec>p.lead{color:var(--muted);margin:0 0 14px;max-width:70ch}
+
+.item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-top:12px}
+.item.done{border-color:var(--rec)}
+.ihead{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.iid{font-family:var(--f-mono);font-size:12px;color:var(--accent);padding-top:3px}
+.ihead h4{margin:0;font-size:17px;flex:1;min-width:200px;line-height:1.5}
+.detail{margin:8px 0 0;min-width:0}
+.detail p{margin:6px 0}
+.detail ul,.detail ol{margin:6px 0;padding-left:1.4em}
+.detail li{margin:2px 0}
+.src{font-family:var(--f-mono);font-size:11.5px;color:var(--accent);white-space:nowrap}
+.note-assume{background:var(--warn-soft);color:var(--ink);border-radius:6px;padding:6px 10px;font-size:13.5px;margin:8px 0}
+.note-assume b{color:var(--warn)}
+.tbl{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-weight:700;color:var(--muted);font-size:12.5px;letter-spacing:.04em}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.opts{display:grid;gap:8px;margin-top:12px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;background:var(--paper)}
+.opt:hover{border-color:var(--accent)}
+.opt input{margin-top:5px;accent-color:var(--rec);flex:none}
+.opt.sel{border-color:var(--rec);background:var(--rec-soft)}
+.opt .ol{font-weight:500}
+.opt .od{display:block;font-size:13px;color:var(--muted)}
+.rec{font-size:11.5px;color:var(--rec);border:1px solid var(--rec);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
+textarea{width:100%;box-sizing:border-box;margin-top:10px;min-height:44px;resize:vertical;font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+
+.triage{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:baseline;margin-right:4px}
+.t-r{background:var(--red)}.t-y{background:var(--yellow)}.t-g{background:var(--green)}.t-b{background:var(--black)}.t-i{background:transparent;border:2px dashed var(--red);width:8px;height:8px}
+
+.maps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:10px}
+.map{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+.map h5{margin:0 0 6px;font-size:14px}
+.map svg{width:100%;height:auto;display:block}
+.map svg .wall{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+.map svg .cor{fill:var(--accent-soft);stroke:none}
+.map svg .out{fill:none;stroke:var(--muted);stroke-dasharray:4 3}
+.map svg text{fill:var(--ink);font-size:11px;font-family:var(--f-body)}
+.map svg text.s{fill:var(--muted);font-size:9.5px}
+.map svg .door{stroke:var(--rec);stroke-width:4}
+.map svg .lim{fill:var(--warn);font-size:9.5px}
+.map svg .arrow{stroke:var(--accent);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+.map svg #ah path{fill:var(--accent)}
+.map ul{font-size:13px;margin:6px 0 0;padding-left:1.2em}
+
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.flow span{border:1px solid var(--line);border-radius:6px;padding:1px 8px;background:var(--paper)}
+.flow em{font-style:normal;color:var(--muted)}
+
+.final{margin-top:40px}
+.foot{margin-top:24px;font-size:13px;color:var(--muted)}
+@media (max-width:520px){.intro h2{font-size:24px}section.sec>h3{font-size:20px}.item{padding:14px}}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+<header class="top"><div class="topin">
+  <h1>急救站佈局遊戲 · 設計審核</h1>
+  <div class="prog"><div class="bar"><i id="bar"></i></div><span id="progtxt">0 / 0 已決</span></div>
+  <button class="btn" id="acceptRec" type="button">未決項目全部採用建議</button>
+  <span class="save" id="save">連線中…</span>
+</div></header>
+
+<div class="wrap">
+<div class="intro">
+  <h2>「急救站佈局挑戰」遊戲設計規格（草案 v1）</h2>
+  <p>先在空場地擺好各功能區，再按下開始，看患者、工作人員、物資怎麼在站內流動，最後用指標回頭檢討配置。對象是民防醫護課堂分組，場地衛生所型、教室型兩種都做，第三類（BORP）留到進階關。</p>
+  <p>每一項請選一個選項，有意見就寫在下方欄位。選擇會自動儲存，你審完跟我說一聲，我會直接讀取結果。</p>
+  <div class="legend">
+    <span class="chip g">指引 p.N＝出自急救站設置參考指引第二版</span>
+    <span class="chip a">遊戲假設＝我訂的參數，非指引內容</span>
+    <span class="chip d">已決</span>
+  </div>
+  <nav class="toc" id="toc"></nav>
+</div>
+<main id="main"></main>
+
+<section class="sec final">
+  <h3><b>Z</b>整體意見</h3>
+  <div class="item" id="item-Z1"><div class="ihead"><span class="iid">Z1</span><h4>還有什麼想加、想刪、或我漏掉的？</h4></div>
+  <textarea id="note-Z1" placeholder="例如：想加入夜間照明不足、志工不熟流程……"></textarea></div>
+</section>
+<p class="foot">素材：衛福部《急救站設置參考指引》第二版（114.10.23 修正）、台灣急診醫學會民防醫護公版教材 1 急救站設置、3 大傷應變。頁碼皆為指引 PDF 頁碼。</p>
+</div>
+
+<script>
+const S = [
+{id:'A',title:'教學目標與課堂情境',lead:'先定「玩完要學到什麼」，後面的規則都從這裡推。',items:[
+ {id:'A1',q:'三個學習目標',detail:`<ol>
+  <li><b>配置決定動線</b>：同一批患者，擺法不同，等候時間、人員步數、轉出速度就不同。</li>
+  <li><b>清汙分流與感控</b>：隔離、廢棄物、遺體的動線不能和一般患者交叉 <span class="src">指引 p.14–16</span>。</li>
+  <li><b>彈性擴充</b>：公共空間與領藥區要能轉成大量傷病患的檢傷擴充區 <span class="src">指引 p.12、p.15</span>。</li></ol>`,
+  opts:[{v:'ok',l:'同意這三個目標',rec:1},{v:'mod',l:'要調整（寫在下方）'}]},
+ {id:'A2',q:'一場課堂的時間與節奏',detail:`<div class="tbl"><table><tr><th>階段</th><th>20 分鐘版</th><th>內容</th></tr>
+  <tr><td>簡報</td><td class="num">1 分</td><td>情境卡＋場地介紹</td></tr>
+  <tr><td>第一輪佈置</td><td class="num">5 分</td><td>小組討論擺放</td></tr>
+  <tr><td>第一輪模擬＋結算</td><td class="num">4 分</td><td>快轉 2 小時營運，看指標</td></tr>
+  <tr><td>第二輪改版＋事件卡</td><td class="num">6 分</td><td>改配置，抽一張事件卡再跑</td></tr>
+  <tr><td>全班討論</td><td class="num">4 分</td><td>投影各組配置比較</td></tr></table></div>`,
+  opts:[{v:'20',l:'20 分鐘版',d:'兩輪，第二輪帶一張事件卡',rec:1},{v:'30',l:'30 分鐘版',d:'三輪，事件卡兩張，討論更久'},{v:'15',l:'15 分鐘版',d:'只跑一輪，不含事件卡'}]},
+ {id:'A3',q:'分組使用的裝置',detail:'<p>影響操作方式與畫面大小。拖放在手機上比較難操作。</p>',
+  opts:[{v:'tablet',l:'每組一台平板或筆電',d:'4–6 人圍著一台討論',rec:1},{v:'phone',l:'每人手機',d:'畫面小，需要簡化操作'},{v:'mixed',l:'都要支援',d:'以平板為主，手機可玩但不最佳化'}]},
+ {id:'A4',q:'跨組比較方式',detail:'<p>投影並排比較比較能帶出討論；排行榜比較有競賽感，但容易讓學員只追分數。</p>',
+  opts:[{v:'compare',l:'講師投影各組配置並排比較',d:'各組匯出一張「配置＋指標」結果卡',rec:1},{v:'rank',l:'全班排行榜'},{v:'both',l:'兩者都要'},{v:'none',l:'都不要，各組自己看'}]},
+ {id:'A5',q:'情境卡',detail:`<ul>
+  <li><b>教室型</b>：颱風後道路中斷，○○國小被指定為第二類急救站，預計孤立 72 小時（參考教材-1 卡努颱風、小犬颱風案例）。</li>
+  <li><b>衛生所型</b>：動員實施階段，○○衛生所開設第一類急救站 <span class="src">指引 p.5</span>。</li></ul>`,
+  opts:[{v:'ok',l:'用這兩個情境',rec:1},{v:'mod',l:'換成其他情境（寫在下方）'}]},
+]},
+{id:'B',title:'場地',lead:'場地刻意帶限制，學員才需要取捨。底下是草圖，實際格局 Sprint 1 再精修。',items:[
+ {id:'B1',q:'兩張場地底圖與限制',detail:`<div class="maps">
+  <div class="map"><h5>教室型（第二類，參考指引圖 2）</h5>
+  <svg viewBox="0 0 320 200" role="img" aria-label="教室型場地草圖">
+   <defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8z"/></marker></defs>
+   <rect class="out" x="4" y="4" width="312" height="30"/><text x="12" y="23">室外：救護車停放／罹難遺體（擇位）</text>
+   <rect class="wall" x="10" y="44" width="58" height="80"/><rect class="wall" x="70" y="44" width="58" height="80"/><rect class="wall" x="130" y="44" width="58" height="80"/><rect class="wall" x="190" y="44" width="58" height="80"/><rect class="wall" x="250" y="44" width="58" height="80"/>
+   <text x="22" y="80">教室 1</text><text x="82" y="80">教室 2</text><text x="142" y="80">教室 3</text><text x="202" y="80">教室 4</text><text x="262" y="80">教室 5</text>
+   <text class="s" x="22" y="96">約 20 坪</text><text class="lim" x="140" y="96">有水槽</text><text class="lim" x="258" y="96">近後門</text>
+   <rect class="cor" x="10" y="126" width="298" height="22"/><text x="128" y="141">走廊（公共空間）</text>
+   <line class="door" x1="4" y1="128" x2="4" y2="146"/><line class="door" x1="314" y1="128" x2="314" y2="146"/>
+   <text class="lim" x="8" y="164">西端：樓梯（擔架不能進）</text><text class="lim" x="196" y="164">東端：唯一坡道</text>
+   <rect class="out" x="10" y="172" width="298" height="22"/><text x="18" y="187">操場（可做 MCI 檢傷擴充）</text>
+  </svg>
+  <ul><li>擔架只能從東端坡道進出</li><li>走廊窄，擔架無法交會</li><li>只有教室 3 有水槽（適合診療）</li><li>教室 5 靠後門（適合廢棄物或隔離）</li></ul></div>
+  <div class="map"><h5>衛生所型（第一類，參考指引圖 1）</h5>
+  <svg viewBox="0 0 320 200" role="img" aria-label="衛生所型場地草圖">
+   <rect class="out" x="4" y="4" width="200" height="26"/><text x="12" y="21">室外：救護車停放</text>
+   <rect class="out" x="252" y="40" width="64" height="60"/><text class="s" x="258" y="66">室外空地</text><text class="s" x="258" y="80">（遺體可放）</text>
+   <rect class="wall" x="10" y="40" width="236" height="130"/>
+   <rect class="wall" x="10" y="40" width="60" height="44"/><text x="18" y="66">房 A</text>
+   <rect class="wall" x="70" y="40" width="54" height="44"/><text x="78" y="66">房 B</text>
+   <rect class="wall" x="186" y="40" width="60" height="44"/><text x="194" y="66">房 C</text>
+   <rect class="wall" x="10" y="84" width="60" height="44"/><text x="18" y="110">房 D</text>
+   <rect class="wall" x="10" y="128" width="60" height="42"/><text x="18" y="152">房 E</text>
+   <rect class="wall" x="70" y="104" width="58" height="66"/><text x="78" y="140">房 F</text>
+   <rect class="wall" x="130" y="104" width="56" height="66"/><text x="138" y="134">房 G</text><text class="lim" x="134" y="150">X 光固定</text>
+   <rect class="wall" x="186" y="84" width="60" height="86"/><text x="194" y="128">房 H（大）</text>
+   <rect class="cor" x="71" y="85" width="114" height="18"/><rect class="cor" x="125" y="41" width="60" height="44"/><text x="128" y="66">大廳</text>
+   <line class="door" x1="140" y1="38" x2="170" y2="38"/><text class="s" x="132" y="36">前門</text>
+   <line class="door" x1="20" y1="172" x2="50" y2="172"/><text class="s" x="22" y="186">後門</text>
+   <text class="lim" x="70" y="194">房 G 有 X 光機，不能改用途</text>
+  </svg>
+  <ul><li>前門、後門各一，前門有台階需加坡道</li><li>大廳小，候診容易塞</li><li>房 G 有固定 X 光機</li><li>房 H 最大，適合留觀</li></ul></div></div>`,
+  opts:[{v:'fic',l:'用虛構場地（如上，限制可再調）',rec:1},{v:'real',l:'改用實際場地當藍本（寫出哪個場地）',d:'例如保安寺急救站、藍鵲行動，需要平面圖或照片'},{v:'both',l:'先虛構，進階關再加實際場地'}]},
+ {id:'B2',q:'坪數比例與空間是否夠用',detail:`<p>指引最低限度約 <b>40 坪、9 個功能區</b> <span class="src">指引 p.10</span>。教室型 5 間 × 20 坪＝100 坪，空間寬鬆，難點在<b>動線</b>；衛生所型約 55 坪，難點在<b>擠</b>。</p>
+  <div class="note-assume"><b>遊戲假設</b>：教室約 20 坪（8×9 m）、衛生所總面積約 55 坪，皆為設定值。</div>`,
+  opts:[{v:'ok',l:'同意這樣的難度差異',rec:1},{v:'tight',l:'教室型也要擠一點（例如只開放 3 間教室）'},{v:'mod',l:'其他（寫在下方）'}]},
+]},
+{id:'C',title:'佈置操作',lead:'學員在這個階段做的事。',items:[
+ {id:'C1',q:'怎麼擺？',detail:`<ul>
+  <li><b>房間指派</b>：點房間 → 選用途。最快，但一間只能一種用途，和指引圖 2「一間教室放藥局＋庫備＋行政」不符。</li>
+  <li><b>格子自由畫</b>：最自由，但 5 分鐘內不容易完成，平板上拖拉也容易誤觸。</li>
+  <li><b>房間切小格</b>：每間房預先切成數格（每格約 2.5 坪），把功能區卡片拖進格子，一個功能區佔幾格就照坪數算。兼顧速度和彈性。</li></ul>`,
+  opts:[{v:'slot',l:'房間切小格，拖卡片進去',rec:1},{v:'room',l:'房間指派（一房一用途）'},{v:'grid',l:'格子自由畫'}]},
+ {id:'C2',q:'要擺的功能區卡片',detail:`<div class="tbl"><table>
+  <tr><th>功能區</th><th>坪數</th><th>指引重點</th><th>出處</th></tr>
+  <tr><td>檢傷掛號區</td><td class="num">4</td><td>靠近入口、單一明顯入口、檢傷前除污</td><td class="src">p.12</td></tr>
+  <tr><td>診療區一、二</td><td class="num">各 4*</td><td>具隱私、至少 2 間、至少 1 床急救床</td><td class="src">p.12</td></tr>
+  <tr><td>留觀區</td><td class="num">6*</td><td>短暫留觀或延長照護</td><td class="src">p.13</td></tr>
+  <tr><td>隔離區</td><td class="num">3*</td><td>容易進入、獨立穿脫防護裝備區</td><td class="src">p.14</td></tr>
+  <tr><td>藥局</td><td class="num">4</td><td>藥品調劑</td><td class="src">p.14</td></tr>
+  <tr><td>庫備品區</td><td class="num">4</td><td>儲存條件、安全性、可近性</td><td class="src">p.14–15</td></tr>
+  <tr><td>公共空間</td><td class="num">5</td><td>候診、領藥、家屬等候；可轉為檢傷擴充區</td><td class="src">p.15</td></tr>
+  <tr><td>廢棄物處理區</td><td class="num">2</td><td>與公共空間、生活區有距離或阻隔</td><td class="src">p.15</td></tr>
+  <tr><td>行政區</td><td class="num">5</td><td>指揮中心，需與醫療照護區分開</td><td class="src">p.16</td></tr>
+  <tr><td>罹難遺體管理區</td><td class="num">5</td><td>與公共空間、生活區有距離或阻隔</td><td class="src">p.16</td></tr>
+  <tr><td>救護車停車</td><td class="num">室外</td><td>上下車區、迴轉處；接收入口與轉出口可分可合</td><td class="src">p.16</td></tr></table></div>
+  <div class="note-assume"><b>需要你裁定</b>：指引 p.10 說醫療照護區合計 11 坪（含診療、留觀、隔離），但 p.12 的表把「診療處置區」單獨標 11 坪，留觀、隔離沒有標坪數。標 * 的是我暫訂的拆法（4＋4＋6＋3＝17 坪，比 11 坪大）。</div>`,
+  opts:[{v:'split',l:'照上表拆法（* 為遊戲假設）',rec:1},{v:'11',l:'嚴格照 p.10：診療＋留觀＋隔離合計 11 坪'},{v:'mod',l:'你給坪數（寫在下方）'}]},
+ {id:'C3',q:'佈置時要不要即時提示錯誤？',detail:`<ul><li><b>硬性錯誤</b>（一定擋）：放不下、室外區塊放進室內、必擺區塊沒擺。</li>
+  <li><b>軟性問題</b>（例如隔離區離入口太遠）：佈置時不提示，模擬後才揭曉。學員自己在模擬中「看到」問題，印象比較深。</li></ul>`,
+  opts:[{v:'hard',l:'只擋硬性錯誤，軟性問題留給模擬',rec:1},{v:'all',l:'全部即時提示'},{v:'none',l:'都不提示'}]},
+ {id:'C4',q:'可以少擺或多擺嗎？',detail:'<p>例如空間不夠時把藥局併入行政區，或多開一間診療區。</p>',
+  opts:[{v:'fixed',l:'第一版固定 11 張卡片，全部要擺',rec:1},{v:'flex',l:'允許合併或加開，模擬結果自然反映'}]},
+]},
+{id:'D',title:'模擬',lead:'按下開始後，畫面上發生的事。',items:[
+ {id:'D1',q:'患者組成',detail:`<ul><li><b>以門診為主</b>：慢性病斷藥、輕傷、發燒，考的是候診與領藥動線。</li>
+  <li><b>以外傷 MCI 為主</b>：紅黃患者多，考的是急救床、留觀和轉出。</li>
+  <li><b>混合</b>：第 1 小時門診穩定進來，第 2 小時突然湧入一批外傷，公共空間能不能轉成檢傷擴充區就成了關鍵。</li></ul>`,
+  opts:[{v:'mix',l:'混合（前段門診、後段 MCI）',rec:1},{v:'opd',l:'以門診為主'},{v:'mci',l:'以外傷 MCI 為主'}]},
+ {id:'D2',q:'各類患者的路徑',detail:`<div class="tbl"><table><tr><th>類別</th><th>路徑</th></tr>
+  <tr><td><span class="triage t-r"></span>重症</td><td><div class="flow"><span>入口</span><em>→</em><span>檢傷</span><em>→</em><span>診療（急救床）</span><em>→</em><span>留觀</span><em>→</em><span>救護車轉出</span></div></td></tr>
+  <tr><td><span class="triage t-y"></span>中症</td><td><div class="flow"><span>入口</span><em>→</em><span>檢傷</span><em>→</em><span>候診</span><em>→</em><span>診療</span><em>→</em><span>留觀 或 領藥出院</span></div></td></tr>
+  <tr><td><span class="triage t-g"></span>輕症</td><td><div class="flow"><span>入口</span><em>→</em><span>檢傷</span><em>→</em><span>候診</span><em>→</em><span>診療</span><em>→</em><span>藥局領藥</span><em>→</em><span>出口</span></div></td></tr>
+  <tr><td><span class="triage t-b"></span>死亡</td><td><div class="flow"><span>入口</span><em>→</em><span>檢傷</span><em>→</em><span>罹難遺體區</span><em>→</em><span>民政接手</span></div></td></tr>
+  <tr><td><span class="triage t-i"></span>疑似傳染</td><td><div class="flow"><span>入口</span><em>→</em><span>檢傷</span><em>→</em><span>隔離區（不經公共空間）</span><em>→</em><span>轉出</span></div></td></tr></table></div>
+  <p>留觀中有一定比例會惡化，要從留觀再轉出（參考教材-1 p.35 通用流程）。</p>`,
+  opts:[{v:'ok',l:'同意這些路徑',rec:1},{v:'mod',l:'要調整（寫在下方）'}]},
+ {id:'D3',q:'工作人員',detail:`<p>指引白班 13 人：醫師 2、護理師 3、藥師 1、放射師 1、醫檢師 1、心理或社工 1、醫務行政 2、志工及替代役 2 <span class="src">指引 p.19</span>。</p>
+  <p>建議簡化成 <b>6 種角色、9 人</b>：醫師 2、護理師 3、藥師 1、行政 1、志工／替代役 2（負責搬運、補貨、廢棄物、引導）。其餘角色先不畫，以免畫面太亂。</p>`,
+  opts:[{v:'simple',l:'簡化成 6 角色 9 人',rec:1},{v:'full',l:'照指引 13 人'},{v:'choose',l:'讓學員在佈置階段自己分配人力',d:'多一個決策層次，但時間會更緊'}]},
+ {id:'D4',q:'物資、廢棄物與遺體的流動',detail:`<ul>
+  <li><b>補貨</b>：診療、留觀每處置一定人數就要補一次，由志工從庫備品區送過去；藥局也從庫備補藥。</li>
+  <li><b>廢棄物</b>：診療、留觀、隔離產生，由志工送到廢棄物區，再從後門運出。</li>
+  <li><b>遺體</b>：從檢傷或留觀移到罹難遺體區，最後交由民政單位接手 <span class="src">指引 p.16</span>。</li></ul>
+  <p>這三條線若穿過公共空間或診療區，就算一次「動線交叉」。</p>`,
+  opts:[{v:'ok',l:'同意',rec:1},{v:'mod',l:'要調整（寫在下方）'}]},
+ {id:'D5',q:'模擬畫面怎麼呈現',detail:'<p>2 小時營運壓縮成約 3 分鐘，可暫停、1×／2×／4× 倍速。小人與物資以彩色圓點在平面圖上移動，跑完疊一層「熱區圖」顯示哪裡塞。</p>',
+  opts:[{v:'dots',l:'彩色圓點動畫＋結束後熱區圖',rec:1},{v:'heat',l:'只要結果熱區圖，不看動畫'},{v:'live',l:'動畫中即時顯示熱區'}]},
+ {id:'D6',q:'模擬參數（處置時間、走路速度等）',detail:`<div class="note-assume"><b>遊戲假設</b>（指引沒有規定，以下是我的初稿）：步行 1 m/s、擔架需 2 人搬運且速度減半；處置時間：輕症 5 分、中症 15 分、重症 30 分；檢傷每人 1 分；領藥每人 2 分；留觀惡化率 10%；每 2 小時約 40 名患者（指引附件以每日 50 名規劃 <span class="src">指引 p.44</span>）。</div>`,
+  opts:[{v:'mine',l:'先用我的初稿，Sprint 2 時你再微調',rec:1},{v:'yours',l:'我想先提供臨床經驗值（寫在下方）'}]},
+]},
+{id:'E',title:'結算與回饋',lead:'學員看到的結果，決定他們學到什麼。',items:[
+ {id:'E1',q:'結算畫面要顯示哪些指標？（可複選）',multi:1,detail:'<p>建議 4 個，太多學員看不完。</p>',
+  opts:[{v:'wait',l:'平均等候時間',rec:1},{v:'walk',l:'工作人員總步行距離',rec:1},{v:'cross',l:'動線交叉次數（隔離、廢棄物、遺體）',rec:1},{v:'xfer',l:'重症從留觀轉出所需時間',rec:1},{v:'maxwait',l:'最長等候的那一位'},{v:'unserved',l:'超過量能、被轉介的人數'},{v:'stockout',l:'物資斷貨次數'}]},
+ {id:'E2',q:'要不要總分？',detail:'<p>給總分容易讓學員只追分數；不給總分，改用「儀表＋三句評語」引導討論。</p>',
+  opts:[{v:'none',l:'不給總分，只看儀表與評語',rec:1},{v:'score',l:'給 0–100 總分'},{v:'star',l:'給 1–3 星'}]},
+ {id:'E3',q:'回饋怎麼寫',detail:`<p>每個問題用同一個格式：</p>
+  <ol><li><b>發生什麼</b>：「隔離病人穿過候診區 3 次」</li><li><b>為什麼</b>：「隔離區在走廊最裡面，只能經過公共空間」</li><li><b>指引怎麼說</b>：「隔離空間要有容易進入的動線」<span class="src">指引 p.14</span></li></ol>`,
+  opts:[{v:'ok',l:'同意這個格式',rec:1},{v:'mod',l:'要調整（寫在下方）'}]},
+ {id:'E4',q:'判定規則',detail:`<div class="tbl"><table><tr><th>規則</th><th>依據</th></tr>
+  <tr><td>檢傷掛號離入口越近越好；入口要單一</td><td class="src">指引 p.12</td></tr>
+  <tr><td>重症從入口到急救床的距離</td><td class="src">遊戲假設</td></tr>
+  <tr><td>隔離患者不得穿過公共空間</td><td class="src">指引 p.14</td></tr>
+  <tr><td>廢棄物動線不經過公共空間與診療區</td><td class="src">指引 p.15</td></tr>
+  <tr><td>遺體動線不經過公共空間</td><td class="src">指引 p.16</td></tr>
+  <tr><td>行政區與醫療照護區分開</td><td class="src">指引 p.16</td></tr>
+  <tr><td>庫備品到診療、留觀、藥局的補貨距離</td><td class="src">遊戲假設</td></tr>
+  <tr><td>留觀到救護車的轉出距離（擔架只能走坡道）</td><td class="src">指引 p.8、p.16</td></tr>
+  <tr><td>MCI 湧入時，公共空間能否轉為檢傷擴充區</td><td class="src">指引 p.12、p.15</td></tr></table></div>`,
+  opts:[{v:'ok',l:'同意這些規則',rec:1},{v:'mod',l:'要增刪（寫在下方）'}]},
+ {id:'E5',q:'隱藏結局',detail:'<p>例如隔離區擺錯，模擬後段出現「候診區 2 人開始發燒」；遺體從候診區運出，家屬情緒失控、志工被拉去安撫。比單看數字更有衝擊力。</p>',
+  opts:[{v:'yes',l:'要，第二輪才出現',rec:1},{v:'r1',l:'要，第一輪就出現'},{v:'no',l:'不要，只看數字'}]},
+]},
+{id:'F',title:'事件卡',lead:'第二輪模擬時抽一張，考驗配置的彈性。',items:[
+ {id:'F1',q:'第一版要哪幾張？（可複選）',multi:1,detail:'<p>每張卡都標了它要教的重點。</p>',
+  opts:[{v:'surge',l:'突然湧入 15 名外傷',d:'公共空間轉檢傷擴充區 指引 p.12',rec:1},{v:'infect',l:'疑似傳染病患 3 名',d:'隔離動線、穿脫防護裝備 指引 p.14',rec:1},{v:'power',l:'停電 30 分鐘',d:'基礎水電維生設備 指引附件五',rec:1},{v:'noamb',l:'救護車 2 小時到不了',d:'留觀變延長照護、床位不夠',rec:1},{v:'death',l:'一名死亡、家屬在場',d:'遺體動線與觀感'},{v:'staff',l:'一名護理師受傷下線',d:'人力不足時誰顧哪一區'},{v:'supply',l:'庫備品區淹水',d:'物資備援與重新配置'}]},
+ {id:'F2',q:'抽卡方式',detail:'',
+  opts:[{v:'random',l:'隨機抽，各組不同',d:'全班討論時情境多元',rec:1},{v:'teacher',l:'講師指定，全班同一張',d:'比較公平，好比較'},{v:'choose',l:'學員自選'}]},
+]},
+{id:'G',title:'畫面與講師工具',lead:'',items:[
+ {id:'G1',q:'畫風',detail:'<p>俯視平面圖和指引的示意圖是同一種語言，學員比較容易對應回教材，開發也最快。</p>',
+  opts:[{v:'plan',l:'俯視平面圖（藍圖風）',rec:1},{v:'iso',l:'等角 2.5D 小人風',d:'比較可愛，開發時間約多一倍'},{v:'flat',l:'簡約扁平色塊'}]},
+ {id:'G2',q:'講師工具',detail:'<p>各組結果要怎麼回到講師手上。</p>',
+  opts:[{v:'card',l:'各組產生一張結果卡，講師收集投影',d:'第一版最簡單',rec:1},{v:'live',l:'做講師頁，各組結果自動匯整',d:'需要網路與登入，較複雜，建議第二版'},{v:'none',l:'不需要'}]},
+ {id:'G3',q:'新手教學',detail:'<p>第一次打開時，用 30 秒互動導覽教會拖卡片、按開始、看結算。</p>',
+  opts:[{v:'yes',l:'要',rec:1},{v:'no',l:'不用，講師口頭說明'}]},
+]},
+{id:'H',title:'開發與發布',lead:'',items:[
+ {id:'H1',q:'Sprint 拆法',detail:`<ol>
+  <li><b>Sprint 1</b>：兩張場地底圖＋功能區卡片拖放＋硬性錯誤檢查</li>
+  <li><b>Sprint 2</b>：患者流動模擬（尋路、排隊、處置時間）</li>
+  <li><b>Sprint 3</b>：工作人員、物資、廢棄物、遺體流動</li>
+  <li><b>Sprint 4</b>：結算指標、回饋文字、熱區圖、結果卡</li>
+  <li><b>Sprint 5</b>：事件卡＋隱藏結局＋新手教學</li>
+  <li><b>之後</b>：第三類急救站（BORP）進階關、講師頁</li></ol><p>每個 Sprint 做完停下來等你 Review。</p>`,
+  opts:[{v:'ok',l:'同意',rec:1},{v:'mod',l:'要調整順序或內容'}]},
+ {id:'H2',q:'發布方式',detail:'<p>單一 HTML 檔，離線也能開。</p>',
+  opts:[{v:'gh',l:'完成後放 GitHub Pages 公開，課堂直接開網址',rec:1},{v:'private',l:'只做私人 artifact，課堂用講師帳號'},{v:'file',l:'只要 HTML 檔，複製到各台平板'}]},
+]},
+];
+
+const ALL = S.flatMap(s=>s.items);
+const state = {}; // id -> {choice, note}
+let db=null, col=null;
+const $ = s=>document.querySelector(s);
+
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
+function render(){
+  const toc=$('#toc'), main=$('#main');
+  toc.innerHTML=S.map(s=>`<a href="#sec-${s.id}">${s.id}　${esc(s.title)}<span id="cnt-${s.id}"></span></a>`).join('');
+  main.innerHTML=S.map(s=>`<section class="sec" id="sec-${s.id}"><h3><b>${s.id}</b>${esc(s.title)}</h3>${s.lead?`<p class="lead">${esc(s.lead)}</p>`:''}
+   ${s.items.map(it=>`<div class="item" id="item-${it.id}"><div class="ihead"><span class="iid">${it.id}</span><h4>${esc(it.q)}</h4><span class="chip" id="st-${it.id}">未決</span></div>
+    ${it.detail?`<div class="detail">${it.detail}</div>`:''}
+    <div class="opts" role="${it.multi?'group':'radiogroup'}" aria-label="${esc(it.q)}">
+    ${it.opts.map(o=>`<label class="opt" data-item="${it.id}" data-v="${o.v}"><input type="${it.multi?'checkbox':'radio'}" name="r-${it.id}" id="o-${it.id}-${o.v}" value="${o.v}"><span><span class="ol">${esc(o.l)}</span>${o.rec?'<span class="rec">建議</span>':''}${o.d?`<span class="od">${esc(o.d)}</span>`:''}</span></label>`).join('')}
+    </div><textarea id="note-${it.id}" placeholder="意見或修改（選填）"></textarea></div>`).join('')}</section>`).join('');
+  main.addEventListener('change',e=>{
+    const lab=e.target.closest('.opt'); if(!lab) return;
+    const id=lab.dataset.item, it=ALL.find(x=>x.id===id);
+    const cur=state[id]||{};
+    if(it.multi){cur.choice=[...document.querySelectorAll(`input[name="r-${id}"]:checked`)].map(i=>i.value)}
+    else cur.choice=e.target.value;
+    state[id]=cur; paint(id); save(id);
+  });
+  document.addEventListener('input',e=>{
+    if(!e.target.id||!e.target.id.startsWith('note-')) return;
+    const id=e.target.id.slice(5); state[id]=state[id]||{}; state[id].note=e.target.value; debounce(id);
+  });
+}
+function decided(id){const c=state[id]?.choice;return Array.isArray(c)?c.length>0:!!c}
+function paint(id){
+  const it=ALL.find(x=>x.id===id);
+  if(it){
+    const c=state[id]?.choice, arr=Array.isArray(c)?c:(c?[c]:[]);
+    document.querySelectorAll(`#item-${id} .opt`).forEach(l=>{const on=arr.includes(l.dataset.v);l.classList.toggle('sel',on);l.querySelector('input').checked=on});
+    const d=decided(id); $('#item-'+id).classList.toggle('done',d);
+    const st=$('#st-'+id); st.textContent=d?'已決':'未決'; st.className='chip'+(d?' d':'');
+  }
+  const ta=$('#note-'+id); if(ta && document.activeElement!==ta) ta.value=state[id]?.note||'';
+  progress();
+}
+function progress(){
+  const n=ALL.filter(i=>decided(i.id)).length;
+  $('#progtxt').textContent=`${n} / ${ALL.length} 已決`;
+  $('#bar').style.width=(100*n/ALL.length)+'%';
+  S.forEach(s=>{const k=s.items.filter(i=>decided(i.id)).length;const el=$('#cnt-'+s.id);if(el)el.textContent=`${k}/${s.items.length}`});
+}
+const timers={};
+function debounce(id){clearTimeout(timers[id]);timers[id]=setTimeout(()=>save(id),700)}
+function setSave(t){$('#save').textContent=t}
+async function save(id){
+  const body={choice:state[id]?.choice??null,note:state[id]?.note||'',updatedAt:new Date().toISOString()};
+  try{localStorage.setItem('mrs-review',JSON.stringify(state))}catch(e){}
+  if(!col){setSave('只存在這台裝置');return}
+  setSave('儲存中…');
+  try{await col.doc(id).set(body);setSave('已儲存')}catch(e){setSave('儲存失敗，請重試');console.warn(e)}
+}
+$('#acceptRec').addEventListener('click',()=>{
+  ALL.forEach(it=>{if(decided(it.id))return;const r=it.opts.filter(o=>o.rec).map(o=>o.v);if(!r.length)return;
+    state[it.id]=state[it.id]||{};state[it.id].choice=it.multi?r:r[0];paint(it.id);save(it.id)});
+});
+
+render();
+try{const loc=JSON.parse(localStorage.getItem('mrs-review')||'{}');Object.assign(state,loc)}catch(e){}
+ALL.forEach(i=>paint(i.id)); paint('Z1');
+(async()=>{
+  try{db=await window.claude?.use?.('db')}catch(e){db=null}
+  if(!db){setSave('只存在這台裝置');return}
+  col=db.collection('reviews'); setSave('已連線');
+  col.onSnapshot(snap=>{
+    snap.docs.forEach(d=>{const v=d.data();if(!v)return;state[d.id]={choice:v.choice,note:v.note};paint(d.id)});
+  },err=>{console.warn(err);setSave('同步中斷')});
+})();
+</script>
