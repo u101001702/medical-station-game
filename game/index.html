@@ -104,6 +104,7 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .c-xray{fill:#3b4f78}
 .gridline{stroke:var(--line-faint);stroke-width:.04}
 .roomlbl{fill:var(--chalk-dim);font-family:var(--f-display);font-size:1.6px;text-anchor:middle;pointer-events:none}
+.dim{pointer-events:none}.dim line{stroke:var(--chalk);stroke-width:.1}.dim text{fill:var(--chalk);font-family:var(--f-mono);font-size:1.15px;text-anchor:middle}.dim rect{fill:#0b1d30}
 .roomnote{fill:var(--hl);font-family:var(--f-body);font-size:1.1px;text-anchor:middle;pointer-events:none}
 .outlbl{fill:rgba(169,196,222,.55);font-family:var(--f-display);font-size:1.6px;pointer-events:none}
 .fxlbl{fill:var(--chalk);font-family:var(--f-body);font-size:1px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
@@ -244,12 +245,12 @@ function mapClassroom(){
   feats['30,5']=feats['32,5']='sink';
   [30,47,64].forEach(x=>{feats[`${x},13`]='outlet';feats[`${x+15},13`]='outlet'});
   feats['40,27']='outlet';
-  return {id:'classroom',tab:'教室型',W,H,vx,vy,g,feats,rooms,
+  return {id:'classroom',tab:'教室型',W,H,vx,vy,g,feats,rooms,dim:{x:24,y:5,w:56,h:23,top:3.1,side:20},
     outLabels:[{t:'操場',x:44,y:32.6},{t:'空地',x:84.5,y:18},{t:'道路',x:84,y:34.6}],
-    corridor:{t:'走廊（寬 2 m）',x:52,y:26.6},
+    corridor:{t:'走廊（長 28 m、寬 2 m）',x:52,y:26.6},
     entrances:[{x:23,y:25.5,t:'樓梯',side:'w'},{x:80,y:25.5,t:'坡道',side:'e'},{x:80,y:9.5,t:'後門',side:'e'}],
     scenario:'颱風過後道路中斷，○○國小被指定為第二類急救站，預計孤立 72 小時。你們可以使用 3 間教室和一條走廊。',
-    facts:['走廊西端是樓梯，擔架無法通行','走廊東端是坡道，擔架可以通行','走廊寬 2 m，兩副擔架交會時會塞住','教室 1 有水槽','教室 3 有後門，但有台階','廁所在走廊最西側','每間教室只有 2 個插座']};
+    facts:['室內 28 × 11.5 m；每間教室 8 × 9 m','走廊西端是樓梯，擔架無法通行','走廊東端是坡道，擔架可以通行','走廊寬 2 m，兩副擔架交會時會塞住','教室 1 有水槽','教室 3 有後門，但有台階','廁所在走廊最西側','每間教室只有 2 個插座']};
 }
 function mapHealth(){
   const W=53,H=40,vx=3,vy=0,g=grid(W,H,'G'); crop(g,vx,vy); fill(g,vx,0,W-1,1,'R');
@@ -261,14 +262,14 @@ function mapHealth(){
   fill(g,41,9,45,14,'T'); fill(g,28,27,33,32,'X');
   const feats={'8,24':'sink','18,24':'sink'};
   [[8,13],[20,13],[35,13],[16,28],[26,28],[33,24],[45,28],[35,28],[29,20]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
-  const rooms=[{name:'診間 A',x:8,y:9,w:11,h:9},{name:'大廳',x:20,y:9,w:14,h:9},{name:'診間 C',x:35,y:9,w:11,h:9,note:'含廁所'},
+  const rooms=[{name:'診間 A',x:8,y:9,w:11,h:9},{name:'大廳',x:20,y:9,w:14,h:9},{name:'診間 C',x:35,y:9,w:11,h:9,lx:38,note:'含廁所'},
     {name:'房 D',x:8,y:24,w:9,h:9,note:'有水槽'},{name:'房 E',x:18,y:24,w:9,h:9,note:'有水槽'},{name:'X 光室',x:28,y:24,w:6,h:9,note:'設備固定'},{name:'大診間 G',x:35,y:24,w:11,h:9}];
-  return {id:'health',tab:'衛生所型',W,H,vx,vy,g,feats,rooms,
+  return {id:'health',tab:'衛生所型',W,H,vx,vy,g,feats,rooms,dim:{x:8,y:9,w:38,h:24,top:5.4,side:5.5},
     outLabels:[{t:'前方空地',x:12,y:5},{t:'後方空地',x:34,y:37},{t:'道路',x:44,y:1.4}],
-    corridor:{t:'走廊',x:27,y:22},
+    corridor:{t:'走廊（長 19 m、寬 2 m）',x:19,y:22},
     entrances:[{x:27.5,y:8,t:'前門（台階）',side:'n'},{x:12.5,y:33,t:'後門（平面）',side:'s'}],
     scenario:'動員實施階段，○○衛生所開設第一類急救站。原有隔間不能拆，X 光室設備固定不能移動。',
-    facts:['前門有台階，擔架無法通行','後門是平面，擔架可以通行','大廳約 10 坪，候診容易擁擠','X 光室設備固定，不能改作其他用途','廁所在診間 C 內','總室內面積約 60 坪']};
+    facts:['室內 19 × 12 m','前門有台階，擔架無法通行','後門是平面，擔架可以通行','大廳約 10 坪，候診容易擁擠','X 光室設備固定，不能改作其他用途','廁所在診間 C 內','總室內面積約 60 坪']};
 }
 function mapUnderground(){
   const W=58,H=35,vx=8,vy=3,g=grid(W,H,'G'); crop(g,vx,vy); fill(g,8,vy,9,H-1,'R');
@@ -277,11 +278,11 @@ function mapUnderground(){
   [25,33,41,49].forEach(x=>{fill(g,x,13,x+1,14,'P');fill(g,x,23,x+1,24,'P')});
   fill(g,52,5,56,10,'T');
   const feats={'19,5':'outlet','38,5':'outlet','38,32':'outlet','55,32':'outlet'};
-  return {id:'underground',tab:'地下空間',W,H,vx,vy,g,feats,rooms:[{name:'地下開放空間（約 80 坪）',x:19,y:5,w:38,h:28,big:1},{name:'廁所',x:52,y:5,w:5,h:6,small:1}],
+  return {id:'underground',tab:'地下空間',W,H,vx,vy,g,feats,dim:{x:19,y:5,w:38,h:28,top:3.5,side:12.5,gap:[17.2,20.2],sideT:11},rooms:[{name:'地下開放空間（約 80 坪）',x:19,y:5,w:38,h:28,big:1},{name:'廁所',x:52,y:5,w:5,h:6,small:1}],
     outLabels:[{t:'地面',x:13,y:32}],
-    entrances:[{x:18,y:18.5,t:'樓梯（唯一出入口）',side:'w'}],
+    entrances:[{x:18,y:18.5,t:'唯一樓梯',side:'w'}],
     scenario:'空襲警報期間，急救站移入地下停車場改建的避難空間。整個空間只有一座樓梯通往地面。',
-    facts:['唯一出入口是西側樓梯，擔架必須以人力抬上抬下','空間內沒有隔間，只有柱子','廁所在東北角','整個空間只有 4 個插座','發電機、救護車只能放在樓梯口外的地面']};
+    facts:['室內 19 × 14 m','唯一出入口是西側樓梯，擔架必須以人力抬上抬下','空間內沒有隔間，只有柱子','廁所在東北角','整個空間只有 4 個插座','發電機、救護車只能放在樓梯口外的地面']};
 }
 const MAPS = [mapClassroom(), mapHealth(), mapUnderground()];
 const MAPBY = Object.fromEntries(MAPS.map(m=>[m.id,m]));
@@ -366,6 +367,13 @@ function zoneLabel(z){
 
 // ===== 繪製 =====
 let baseLayer, tapeLayer, zoneLayer, ghostLayer, heatLayer, fpLayer, agentLayer, alertLayer;
+const meters=n=>+(n*CELL_M).toFixed(1);
+// 建築外側的尺寸線：標室內淨長寬，畫在區塊上層，擺滿了也看得到
+function drawDim(m){const d=m.dim,g=el('g',{class:'dim'},svg),line=(x1,y1,x2,y2)=>el('line',{x1,y1,x2,y2},g),r=d.x+d.w,b=d.y+d.h,t=.45;
+  line(d.x,d.top,r,d.top);line(d.x,d.top-t,d.x,d.top+t);line(r,d.top-t,r,d.top+t);
+  const [g0,g1]=d.gap||[b,b];line(d.side,d.y,d.side,g0);if(d.gap)line(d.side,g1,d.side,b);line(d.side-t,d.y,d.side+t,d.y);line(d.side-t,b,d.side+t,b);
+  const label=(x,y,t,rot)=>{const w=t.length*.72+.5,o=rot?{transform:`rotate(-90 ${x} ${y})`}:{};el('rect',{x:x-w/2,y:y-.75,width:w,height:1.5,rx:.25,...o},g);el('text',{x,y:y+.4,...o},g).textContent=t};
+  label(d.x+d.w/2,d.top,meters(d.w)+' m');label(d.side,d.sideT??d.y+d.h/2,meters(d.h)+' m',true)}
 function drawBase(){
   const m=map(); svg.innerHTML='';
   svg.setAttribute('viewBox',`${m.vx} ${m.vy} ${m.W-m.vx} ${m.H-m.vy}`);
@@ -408,8 +416,11 @@ function drawBase(){
     if(r.big){el('text',{x:r.x+r.w/2,y:r.y+r.h-.6,class:'roomlbl'},baseLayer).textContent=r.name;return}
     const fs=Math.min(1.5,(r.w-.7)/r.name.length*1.05);
     el('text',{x:r.x+r.w/2,y:r.y+1.6,class:'roomlbl','font-size':fs+'px'},baseLayer).textContent=r.name;
-    el('text',{x:r.x+r.w/2,y:r.y+2.8,class:'roomnote',style:'fill:var(--chalk-dim)'},baseLayer).textContent=`${ping(r.w*r.h)} 坪`+(r.note?'・':'');
-    if(r.note){const t=el('text',{x:r.x+r.w/2,y:r.y+4,class:'roomnote'},baseLayer);t.textContent=r.note;t.setAttribute('font-size',Math.min(1.1,(r.w-.5)/r.note.length*1.05)+'px')}
+    // 窄的房間尺寸、坪數分兩行；字數放不下就縮小
+    const cx=r.lx??r.x+r.w/2,two=r.w<12,note=(t,y,col)=>{const e=el('text',{x:cx,y,class:'roomnote',style:`font-size:${Math.min(1.1,(r.w-.5)/(t.length*.62))}px${col?';fill:'+col:''}`},baseLayer);e.textContent=t};
+    const size=`${meters(r.w)} × ${meters(r.h)} m`,area=`${ping(r.w*r.h)} 坪`,dimC='var(--chalk-dim)';
+    if(two){note(size,r.y+2.8,dimC);note(area,r.y+4,dimC)}else note(`${size}・${area}`,r.y+2.8,dimC);
+    if(r.note) note(r.note,r.y+(two?5.2:4));
   });
   if(m.corridor) el('text',{x:m.corridor.x,y:m.corridor.y,class:'roomlbl'},baseLayer).textContent=m.corridor.t;
   m.outLabels.forEach(o=>el('text',{x:o.x,y:o.y,class:'outlbl'},baseLayer).textContent=o.t);
@@ -417,7 +428,7 @@ function drawBase(){
     const off={w:[-.4,0,'end'],e:[1.4,0,'start'],n:[.5,-.6,'middle'],s:[.5,2.4,'middle']}[e.side];
     el('text',{x:e.x+off[0],y:e.y+off[1]+(e.side==='w'||e.side==='e'?.6:0),'text-anchor':off[2],fill:'var(--hl)','font-size':'1.1px','font-family':'var(--f-body)','pointer-events':'none'},baseLayer).textContent=e.t;
   });
-  tapeLayer=el('g',{},svg); zoneLayer=el('g',{},svg); heatLayer=el('g',{'pointer-events':'none'},svg); fpLayer=el('g',{'pointer-events':'none'},svg); agentLayer=el('g',{'pointer-events':'none'},svg); alertLayer=el('g',{'pointer-events':'none'},svg); ghostLayer=el('g',{},svg);
+  tapeLayer=el('g',{},svg); zoneLayer=el('g',{},svg); heatLayer=el('g',{'pointer-events':'none'},svg); fpLayer=el('g',{'pointer-events':'none'},svg); agentLayer=el('g',{'pointer-events':'none'},svg); alertLayer=el('g',{'pointer-events':'none'},svg); drawDim(m); ghostLayer=el('g',{},svg);
   applyZoom();
 }
 function drawTapes(){tapeLayer.innerHTML='';
