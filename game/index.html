@@ -112,18 +112,20 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .zone .zn{font-size:1.4px;font-weight:700}
 .zone .za{font-size:1.1px;font-family:var(--f-mono)}
 .zone.sel rect.body{stroke:var(--hl);stroke-width:.28}
+.tape{cursor:pointer}.tape .sel{stroke:#fff;stroke-width:.16}
 .handle{fill:var(--hl);stroke:var(--blue-deep);stroke-width:.14;cursor:nwse-resize}
 .ghost{fill:rgba(124,255,178,.18);stroke:var(--ok);stroke-width:.2;stroke-dasharray:.5 .35;pointer-events:none}
 .ghost.bad{fill:rgba(255,107,107,.18);stroke:var(--bad)}
 
 /* 模擬 */
-.simbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}
+.simbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}.simbar[hidden]{display:none}
 .simbar .clk{font-family:var(--f-mono);font-size:20px;font-weight:500;color:var(--hl);font-variant-numeric:tabular-nums;min-width:4.2em}
 .prog2{flex:1 1 120px;height:6px;background:var(--panel-line);border-radius:3px;overflow:hidden}
 .prog2 i{display:block;height:100%;background:var(--hl)}
 .tbtn.on{background:var(--chalk);color:var(--blue-deep);border-color:var(--chalk)}
 .tbtn.go{border-color:var(--ok);color:var(--ok)}
-.simming .cards,.simming .palette h2,.simming .palette .hint{display:none}
+.simming .cards,.simming .palette h2,.simming .palette .hint,.simming #tapeBtn{display:none}
+#tapeBtn.on{background:var(--hl);color:#0b1d30}
 .simming #runSim,.simming #clearMap{display:none}
 .agent>*{stroke-width:.13}
 .agent.waiting>*{stroke:#fff;stroke-dasharray:.25 .18;stroke-width:.16}
@@ -178,8 +180,9 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
   <div class="main">
     <aside class="pane palette">
       <h2>功能區卡片</h2>
-      <p class="hint">點卡片後在平面圖上拖曳畫出範圍，只點一下就用預設大小；也可以把卡片直接拖進平面圖，拖到已擺好的區塊上就是合併。同一張卡片可以擺很多次。</p>
+      <p class="hint">封鎖線擋患者和擔架，工作人員可穿過。點卡片後在平面圖上拖曳畫出範圍，只點一下就用預設大小；也可以把卡片直接拖進平面圖，拖到已擺好的區塊上就是合併。同一張卡片可以擺很多次，相同區塊貼齊成長方形會自動併成一區。</p>
       <div class="cards" id="cards"></div>
+      <button class="tbtn" id="tapeBtn" type="button">封鎖線</button>
       <div class="simbar" id="simbar" hidden></div>
     </aside>
     <div class="mapwrap" id="mapwrap">
@@ -284,7 +287,7 @@ const MAPS = [mapClassroom(), mapHealth(), mapUnderground()];
 const MAPBY = Object.fromEntries(MAPS.map(m=>[m.id,m]));
 
 // ===== 狀態 =====
-let state = {v:2, mapId:'classroom', layouts:{classroom:[],health:[],underground:[]}, nextId:1, zoom:1};
+let state = {v:2, mapId:'classroom', layouts:{classroom:[],health:[],underground:[]}, tapes:{classroom:[],health:[],underground:[]}, nextId:1, zoom:1};
 let selected = null;     // zone id
 let infoFunc = null;     // 點卡片時顯示說明
 const $ = s=>document.querySelector(s);
@@ -293,6 +296,7 @@ const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
 const map = ()=>MAPBY[state.mapId];
 const zones = ()=>state.layouts[state.mapId];
+const tapes = ()=>state.tapes[state.mapId];
 
 function save(){try{localStorage.setItem('mrs-layout-v2',JSON.stringify(state))}catch(e){}}
 function load(){try{const s=JSON.parse(localStorage.getItem('mrs-layout-v2')||'null');if(s&&s.layouts)state=Object.assign(state,s)}catch(e){}}
@@ -314,8 +318,22 @@ function canPlace(r,funcs,ignoreId){
   if(where!=='any'&&kind!==where) return false;
   for(const z of zones()){ if(z.id===ignoreId) continue;
     if(r.x<z.x+z.w&&r.x+r.w>z.x&&r.y<z.y+z.h&&r.y+r.h>z.y) return false; }
+  for(const t of tapes()) if(r.x<t.x+t.w&&r.x+r.w>t.x&&r.y<t.y+t.h&&r.y+r.h>t.y) return false;
   return true;
 }
+// 封鎖線：只能畫在走得到的格子，不能壓到區塊或入口
+function tapeOK(r){const m=map(),[ax,ay]=ARRIVE[m.id];if(r.x<m.vx||r.y<m.vy||r.x+r.w>m.W||r.y+r.h>m.H)return false;
+  for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(!WALKABLE.has(m.g[y][x])||(x===ax&&y===ay))return false;
+  return !zones().some(z=>r.x<z.x+z.w&&r.x+r.w>z.x&&r.y<z.y+z.h&&r.y+r.h>z.y)}
+// 功能相同、貼在一起且拼起來是長方形的區塊併成一區（區塊只能是長方形，L 形維持兩區）
+function joinZones(list=zones()){let n=0,again=true;
+  const same=(p,q)=>[...p.funcs].sort().join()===[...q.funcs].sort().join();
+  while(again){again=false;
+    for(const z of list){const o=list.find(q=>q!==z&&same(q,z)&&((q.y===z.y&&q.h===z.h&&q.x===z.x+z.w)||(q.x===z.x&&q.w===z.w&&q.y===z.y+z.h)));if(!o)continue;
+      if(o.x>z.x)z.w+=o.w;else z.h+=o.h;
+      z.items=[...(z.items||[]),...(o.items||[])];list.splice(list.indexOf(o),1);if(selected===o.id)selected=z.id;n++;again=true;break}}
+  return n}
+function drawJoined(){const n=joinZones();drawZones();if(n)toast('已併成同一區')}
 function defaultSize(f){
   const F=FUNCS[f]; if(F.size) return F.size.slice();
   const n=Math.round(F.ping/PING_PER_CELL); let h=Math.max(1,Math.round(Math.sqrt(n*0.8))); let w=Math.ceil(n/h); return [w,h];
@@ -347,7 +365,7 @@ function zoneLabel(z){
 }
 
 // ===== 繪製 =====
-let baseLayer, zoneLayer, ghostLayer, heatLayer, fpLayer, agentLayer, alertLayer;
+let baseLayer, tapeLayer, zoneLayer, ghostLayer, heatLayer, fpLayer, agentLayer, alertLayer;
 function drawBase(){
   const m=map(); svg.innerHTML='';
   svg.setAttribute('viewBox',`${m.vx} ${m.vy} ${m.W-m.vx} ${m.H-m.vy}`);
@@ -399,11 +417,17 @@ function drawBase(){
     const off={w:[-.4,0,'end'],e:[1.4,0,'start'],n:[.5,-.6,'middle'],s:[.5,2.4,'middle']}[e.side];
     el('text',{x:e.x+off[0],y:e.y+off[1]+(e.side==='w'||e.side==='e'?.6:0),'text-anchor':off[2],fill:'var(--hl)','font-size':'1.1px','font-family':'var(--f-body)','pointer-events':'none'},baseLayer).textContent=e.t;
   });
-  zoneLayer=el('g',{},svg); heatLayer=el('g',{'pointer-events':'none'},svg); fpLayer=el('g',{'pointer-events':'none'},svg); agentLayer=el('g',{'pointer-events':'none'},svg); alertLayer=el('g',{'pointer-events':'none'},svg); ghostLayer=el('g',{},svg);
+  tapeLayer=el('g',{},svg); zoneLayer=el('g',{},svg); heatLayer=el('g',{'pointer-events':'none'},svg); fpLayer=el('g',{'pointer-events':'none'},svg); agentLayer=el('g',{'pointer-events':'none'},svg); alertLayer=el('g',{'pointer-events':'none'},svg); ghostLayer=el('g',{},svg);
   applyZoom();
 }
+function drawTapes(){tapeLayer.innerHTML='';
+  tapes().forEach(t=>{const g=el('g',{class:'tape','data-tape':t.id},tapeLayer),h=t.w>=t.h;
+    el('rect',{x:t.x+.12,y:t.y+.12,width:t.w-.24,height:t.h-.24,fill:'#ffd23f',class:t.id===selTape?'sel':''},g);
+    el('line',{x1:t.x+(h?.12:.5),y1:t.y+(h?.5:.12),x2:t.x+(h?t.w-.12:.5),y2:t.y+(h?.5:t.h-.12),stroke:'#15181c','stroke-width':.76,'stroke-dasharray':'.7 .7'},g)})}
 function drawZones(){
-  svg.style.cursor=infoFunc?'crosshair':'';
+  svg.style.cursor=infoFunc||tapeMode?'crosshair':'';
+  $('#tapeBtn').classList.toggle('on',tapeMode);$('#tapeBtn').textContent=tapeMode?'結束畫線':'封鎖線';
+  drawTapes();
   if(!zones().some(q=>q.id===selected)) itemMode=null;
   zoneLayer.innerHTML='';
   zones().forEach(z=>{
@@ -442,6 +466,19 @@ function legendRow(svgInner,t){return `<svg viewBox="0 0 22 16" aria-hidden="tru
 function renderInfo(){
   if(mode==='sim'){renderSimInfo();return}
   const info=$('#info'), m=map();
+  const tp=tapes().find(t=>t.id===selTape);
+  if(tp){
+    $('#sideTitle').textContent='封鎖線';
+    info.innerHTML=`<dl class="kv"><dt>長度</dt><dd>${(Math.max(tp.w,tp.h)*CELL_M).toFixed(1)} m</dd></dl>
+      <p class="desc">患者和擔架不能穿過，要繞路；工作人員可以穿過。</p>
+      <div class="acts"><button class="tbtn danger" type="button" id="tapeDel">刪除封鎖線</button></div>`;
+    return;
+  }
+  if(tapeMode){
+    $('#sideTitle').textContent='畫封鎖線';
+    info.innerHTML=`<p>在平面圖上拖曳拉出水平或垂直的直線，可以連續畫好幾條。</p><p class="desc">患者和擔架不能穿過，工作人員可以。線不能壓到區塊，也不能壓到牆。</p>`;
+    return;
+  }
   const z=zones().find(q=>q.id===selected);
   if(z){
     $('#sideTitle').textContent='選取的區塊';
@@ -474,6 +511,7 @@ function renderInfo(){
     <div class="legend">
       ${legendRow('<rect x="2" y="2" width="18" height="12" fill="#123a60" stroke="#7fb4e3" stroke-width="2"/>','室內地板（可擺放）')}
       ${legendRow('<rect x="2" y="2" width="18" height="12" fill="#16385a"/><path d="M2 14 L14 2 M8 14 L20 2" stroke="rgba(127,180,227,.4)"/>','室外空地')}
+      ${legendRow('<rect x="2" y="5" width="18" height="6" fill="#ffd23f"/><line x1="2" y1="8" x2="20" y2="8" stroke="#15181c" stroke-width="6" stroke-dasharray="3 3"/>','封鎖線（患者不能穿過）')}
       ${legendRow('<g stroke="#ffd23f" stroke-width="1.5"><line x1="6" y1="2" x2="6" y2="14"/><line x1="10" y1="2" x2="10" y2="14"/><line x1="14" y1="2" x2="14" y2="14"/></g>','樓梯／台階（擔架不能過）')}
       ${legendRow('<path d="M4 13 L17 3 M10 3 L17 3 L17 10" stroke="#7cffb2" stroke-width="2" fill="none"/>','坡道（擔架可以過）')}
       ${legendRow('<rect x="5" y="3" width="12" height="10" fill="none" stroke="#a9c4de" stroke-dasharray="2 1.5"/>','門')}
@@ -502,6 +540,8 @@ let drag=null; const floating=document.createElement('div'); floating.className=
 function toCell(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;const ctm=svg.getScreenCTM();if(!ctm)return null;const p=pt.matrixTransform(ctm.inverse());return {fx:p.x,fy:p.y,cx:Math.floor(p.x),cy:Math.floor(p.y)}}
 function overMap(ev){const r=wrap.getBoundingClientRect();return ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom}
 function showGhost(r,ok){ghostLayer.innerHTML='';if(!r)return;el('rect',{x:r.x+.05,y:r.y+.05,width:r.w-.1,height:r.h-.1,rx:.27,class:'ghost'+(ok?'':' bad')},ghostLayer)}
+let tapeMode=false, selTape=null;
+$('#tapeBtn').addEventListener('click',()=>{tapeMode=!tapeMode;selected=null;infoFunc=null;selTape=null;drawZones()});
 let toastT; function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>e.hidden=true,1800)}
 
 // 卡片：按下後移動超過 6px 才開始拖曳；沒移動就是點擊看說明
@@ -515,6 +555,10 @@ svg.addEventListener('pointerdown',ev=>{
   if(itemMode){const c=toCell(ev),z=zones().find(q=>q.id===selected);
     if(z&&c&&c.cx>=z.x&&c.cy>=z.y&&c.cx<z.x+z.w&&c.cy<z.y+z.h){placeItem(z,itemMode,c.cx,c.cy);ev.preventDefault();return}
     itemMode=null;renderInfo()}  // 點到區塊外就取消，不要把地圖鎖住
+  selTape=null;
+  if(tapeMode){const c=toCell(ev);if(c){drag={kind:'tape',ax:c.cx,ay:c.cy,sx:ev.clientX,sy:ev.clientY,moved:false};ev.preventDefault()}return}
+  const tg=ev.target.closest('[data-tape]');
+  if(tg){selTape=+tg.dataset.tape;selected=null;infoFunc=null;drawZones();ev.preventDefault();return}
   const h=ev.target.closest('[data-handle]');
   if(h){const z=zones().find(q=>q.id==h.dataset.handle);drag={kind:'resize',z,w:z.w,h:z.h};ev.preventDefault();return}
   const g=ev.target.closest('.zone');
@@ -534,6 +578,11 @@ window.addEventListener('pointermove',ev=>{
     } else {showGhost(null);drag.target=null}
     return;
   }
+  if(drag.kind==='tape'){const c=toCell(ev);if(!c)return;
+    if(Math.hypot(ev.clientX-drag.sx,ev.clientY-drag.sy)>4) drag.moved=true;
+    if(!drag.moved) return;
+    const dx=Math.abs(c.cx-drag.ax),dy=Math.abs(c.cy-drag.ay),r=dx>=dy?{x:Math.min(drag.ax,c.cx),y:drag.ay,w:dx+1,h:1}:{x:drag.ax,y:Math.min(drag.ay,c.cy),w:1,h:dy+1};drag.r=r;
+    showGhost(r,tapeOK(r));const t=el('text',{x:r.x+r.w/2,y:r.y+r.h/2-.8,class:'ghost-size'},ghostLayer);t.textContent=(Math.max(r.w,r.h)*CELL_M).toFixed(1)+' m';return}
   if(drag.kind==='draw'){const c=toCell(ev);if(!c)return;
     if(Math.hypot(ev.clientX-drag.sx,ev.clientY-drag.sy)>4) drag.moved=true;
     if(!drag.moved) return;
@@ -552,41 +601,44 @@ window.addEventListener('pointermove',ev=>{
 });
 window.addEventListener('pointerup',ev=>{
   if(!drag) return; const d=drag; drag=null; floating.hidden=true; showGhost(null);
-  if(d.kind==='pending'){infoFunc=infoFunc===d.func?null:d.func;selected=null;drawZones();return}
+  if(d.kind==='pending'){tapeMode=false;selTape=null;infoFunc=infoFunc===d.func?null:d.func;selected=null;drawZones();return}
+  if(d.kind==='tape'){if(!d.moved)return;if(tapeOK(d.r)){tapes().push({id:state.nextId++,...d.r});drawZones()}else toast('封鎖線不能壓到牆、區塊或入口');return}
   if(d.kind==='draw'){  // 點卡片後在平面圖上拖曳畫出範圍；只點一下就用預設大小
     const c=toCell(ev),r=d.moved?d.r:c&&autoFit(d.func,c.cx,c.cy);
     if(!r||!canPlace(r,[d.func],null)){toast('這裡放不下');return}
-    const z={id:state.nextId++,funcs:[d.func],...r};zones().push(z);selected=z.id;infoFunc=null;drawZones();return}
+    const z={id:state.nextId++,funcs:[d.func],...r};zones().push(z);selected=z.id;infoFunc=null;drawJoined();return}
   if(d.kind==='new'){
     if(!d.target) {if(overMap(ev))toast('這裡放不下');return}
     if(d.target.merge){const z=d.target.merge;
       if(!whereOf([...z.funcs,d.func])){toast('室內和室外的功能不能合併');return}
       if(z.funcs.includes(d.func)&&!FUNCS[d.func].num){toast('這個區塊已經有這項功能');return}
       if(z.funcs.includes(d.func)){toast('這個區塊已經有診療功能');return}
-      z.funcs.push(d.func); selected=z.id; infoFunc=null; drawZones(); toast('已合併：'+zoneLabel(z).join('＋')); return}
-    const z={id:state.nextId++,funcs:[d.func],...d.target.rect}; zones().push(z); selected=z.id; infoFunc=null; drawZones(); return;
+      z.funcs.push(d.func); selected=z.id; infoFunc=null; joinZones(); drawZones(); toast('已合併：'+zoneLabel(z).join('＋')); return}
+    const z={id:state.nextId++,funcs:[d.func],...d.target.rect}; zones().push(z); selected=z.id; infoFunc=null; drawJoined(); return;
   }
   if(d.kind==='move'){
     if(!d.moved){selected=d.z.id;infoFunc=null;drawZones();return}
     const r={x:d.x,y:d.y,w:d.z.w,h:d.z.h}; if(canPlace(r,d.z.funcs,d.z.id)){d.z.x=d.x;d.z.y=d.y} else toast('這裡放不下');
-    selected=d.z.id; drawZones(); return;
+    selected=d.z.id; drawJoined(); return;
   }
-  if(d.kind==='resize'){const r={x:d.z.x,y:d.z.y,w:d.w,h:d.h}; if(canPlace(r,d.z.funcs,d.z.id)){d.z.w=d.w;d.z.h=d.h} else toast('這個大小放不下'); drawZones(); return}
-  if(d.kind==='pan'&&!d.moved&&mode==='layout'){ if(selected||infoFunc){selected=null;infoFunc=null;drawZones()} }
+  if(d.kind==='resize'){const r={x:d.z.x,y:d.z.y,w:d.w,h:d.h}; if(canPlace(r,d.z.funcs,d.z.id)){d.z.w=d.w;d.z.h=d.h} else toast('這個大小放不下'); drawJoined(); return}
+  if(d.kind==='pan'&&!d.moved&&mode==='layout'){ selected=null;infoFunc=null;drawZones() }
 });
 window.addEventListener('pointercancel',()=>{drag=null;floating.hidden=true;showGhost&&ghostLayer&&showGhost(null)});
 
 $('#info').addEventListener('click',ev=>{
+  if(ev.target.id==='tapeDel'){state.tapes[state.mapId]=tapes().filter(t=>t.id!==selTape);selTape=null;drawZones();toast('已刪除');return}
   const z=zones().find(q=>q.id===selected);
   if(ev.target.id==='back'){infoFunc=null;drawZones();return}
   if(!z) return;
   if(ev.target.id==='del'){state.layouts[state.mapId]=zones().filter(q=>q!==z);selected=null;drawZones();toast('已刪除');return}
   if(ev.target.id==='desel'){selected=null;drawZones();return}
-  if(ev.target.id==='rot'){const r={x:z.x,y:z.y,w:z.h,h:z.w};if(canPlace(r,z.funcs,z.id)){z.w=r.w;z.h=r.h;drawZones()}else toast('旋轉後放不下');return}
+  if(ev.target.id==='rot'){const r={x:z.x,y:z.y,w:z.h,h:z.w};if(canPlace(r,z.funcs,z.id)){z.w=r.w;z.h=r.h;drawJoined()}else toast('旋轉後放不下');return}
   const ik=ev.target.dataset.item; if(ik){itemMode=itemMode===ik?null:ik;renderInfo();return}
-  const rm=ev.target.dataset.rmf; if(rm){z.funcs=z.funcs.filter(f=>f!==rm);drawZones()}
+  const rm=ev.target.dataset.rmf; if(rm){z.funcs=z.funcs.filter(f=>f!==rm);drawJoined()}
 });
 window.addEventListener('keydown',ev=>{
+  if((ev.key==='Delete'||ev.key==='Backspace')&&selTape&&!/input|textarea/i.test(document.activeElement.tagName)){state.tapes[state.mapId]=tapes().filter(t=>t.id!==selTape);selTape=null;drawZones();return}
   if((ev.key==='Delete'||ev.key==='Backspace')&&selected&&!/input|textarea/i.test(document.activeElement.tagName)){state.layouts[state.mapId]=zones().filter(q=>q.id!==selected);selected=null;drawZones()}
   if(ev.key==='Escape'){selected=null;infoFunc=null;itemMode=null;drawZones()}
 });
@@ -608,7 +660,7 @@ const P = {
 };
 const PARAM_TEXT = [
   '步行 1 m/s；擔架速度減半；走樓梯時步行減半、擔架只剩 2 成',
-  '分流：紅、黃進中重傷區，綠進輕傷區；本區客滿、另一區有空位時可跨區支援，重症優先',
+  '分流：紅、黃進中重傷區，綠進輕傷區；中重傷區客滿時紅、黃可借輕傷區，重症優先。輕症不進中重傷區，輕傷區滿了就在公共空間候診',
   '處置時間：輕症 5 分、中症 15 分、重症 30 分；隔離 15 分',
   '檢傷每人 1 分（重症 30 秒）；領藥每人 2 分',
   '輕症 10% 於處置後轉重症：改躺、用擔架移到中重傷區（等床時留在原位），再照重症處置與轉出',
@@ -666,10 +718,12 @@ function buildNoGo(){const W=map().W;sim.pzone=new Int16Array(W*map().H);sim.pki
   zones().forEach(z=>{if(z.funcs.includes('public')||z.funcs.includes('amb'))return;
     const k=z.funcs.every(f=>HARD_F.includes(f))?2:z.funcs.some(f=>HARD_F.includes(f)||SOFT_F.includes(f))?1:0;
     if(k)zoneCells(z).forEach(([x,y])=>{sim.pzone[y*W+x]=z.id;sim.pkind[y*W+x]=k})});
+  // 封鎖線：pzone -1 不屬於任何區，患者永遠不能穿過；擔架的寬度也要避開
+  tapes().forEach(t=>zoneCells(t).forEach(([x,y])=>{sim.pzone[y*W+x]=-1;sim.pkind[y*W+x]=2;sim.tape[y*W+x]=1}));
   sim.anchors=sim.anchors.filter(i=>sim.pkind[i]!==2);
   // 管制區裡的定點（遺體區）：擔架至少要到得了區塊門口
   sim.gates=zones().filter(z=>z.funcs.includes('morgue')&&sim.pkind[z.y*W+z.x]===2).map(z=>around(z).map(([x,y])=>y*W+x).filter(i=>sim.walk[i]))}
-function goalZone(targets){const W=map().W,n={};let best=0;targets.forEach(([x,y])=>{const z=sim.pzone[y*W+x];if(z&&(n[z]=(n[z]||0)+1)>(n[best]||0))best=z});return best}
+function goalZone(targets){const W=map().W,n={};let best=0;targets.forEach(([x,y])=>{const z=sim.pzone[y*W+x];if(z>0&&(n[z]=(n[z]||0)+1)>(n[best]||0))best=z});return best}
 function cellCost(i,str,ex){const m=map(),c=m.g[(i/m.W)|0][i%m.W];
   if(!WALKABLE.has(c)||sim.fp[i]||(str&&!sim.wide[i]))return Infinity;
   const k=ex===undefined||sim.pzone[i]===ex?0:sim.pkind[i];if(k===2)return Infinity;
@@ -693,7 +747,7 @@ function getField(targets,str,pat){
 const CM=Math.round(1/CELL_M);                // 1 m 是幾格
 const SPACE_F=['major','minor','obs','iso'], isSpace=f=>SPACE_F.includes(f);
 function computeWide(){const m=map(),W=m.W,H=m.H,w=sim.wide; w.fill(0);
-  const ok=i=>sim.walk[i]&&!sim.fp[i];
+  const ok=i=>sim.walk[i]&&!sim.fp[i]&&!sim.tape[i];
   for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){const i=y*W+x;if(ok(i)&&ok(i+1)&&ok(i+W)&&ok(i+W+1)){w[i]=1;w[i+1]=1;w[i+W]=1;w[i+W+1]=1}}}
 // 從道路入口往內走，看哪些格子到得了
 function reach(str,out){const m=map(),W=m.W,H=m.H,q=sim.bq,[sx,sy]=ARRIVE[m.id];out.fill(0);let h=0,t=0;const s=sy*W+sx;
@@ -785,11 +839,11 @@ function commit(pl){markFp(pl.r,1);if(pl.strip)pl.strip.forEach(([x,y])=>sim.ais
     if(pl.strip){const xs=pl.strip.map(c=>c[0]),ys=pl.strip.map(c=>c[1]),x=Math.min(...xs),y=Math.min(...ys);pl.nodes.push(el('rect',{x:x+.1,y:y+.1,width:Math.max(...xs)-x+.8,height:Math.max(...ys)-y+.8,class:'fp-aisle'},fpLayer))}}}
 function release(pl){markFp(pl.r,0);if(pl.strip)pl.strip.forEach(([x,y])=>sim.aisle[y*map().W+x]--);computeWide();sim.placed.delete(pl);bump();
   sim.R[pl.f].n--; (pl.nodes||[]).forEach(n=>n.remove()); pl.a.inFp=false; pl.a.seated=false; serve()}
-// 空間釋出後依序補人：另一區的重症 → 本區排隊 → 另一區
+// 空間釋出後依序補人：另一區的重症 → 本區排隊 → 另一區（輕症不跨區）
 function serve(){if(sim.serving){sim.again=true;return}sim.serving=true;
   do{sim.again=false;
     for(const f of SPACE_F){const r=sim.R[f];if(!r.zones.length)continue;const tq=TWIN[f]?sim.R[TWIN[f]].queue:[];
-      const order=[...tq.filter(b=>b.cat==='r'),...r.queue,...tq];let hit=false;
+      const order=[...tq.filter(b=>b.cat==='r'),...r.queue,...tq.filter(b=>b.cat!=='g')];let hit=false;
       for(const b of order){if(b.gone||(b.moving&&f!=='major'&&has('major')))continue;const s=fit(b,f);if(s){[r.queue,tq].forEach(q=>{const i=q.indexOf(b);if(i>=0)q.splice(i,1)});takeSlot(b,f,s);hit=true;break}}
       if(hit){sim.again=true;break}}
   }while(sim.again);sim.serving=false}
@@ -959,12 +1013,12 @@ function yieldSlot(f){const r=sim.R[f],v=r.slots.map(x=>x.occ).filter(b=>b&&b.ca
   if(!v)return null;const sl=v.slot.s;v.slot=null;sl.occ=null;v.goal=null;v.goalKind=null;v.svc=null;v.await=null;v.timer=0;dropCarry(v);
   if(v.cs!=null){v.waitTotal+=sim.t-v.cs;v.cs=null} if(v.ss!=null){v.waitTotal+=sim.t-v.ss;v.ss=null}
   v.waitFor=f;v.waitSince=sim.t;r.queue.push(v);r.queue.sort((p,q)=>PRIO[p.cat]-PRIO[q.cat]||p.id-q.id);return sl}
-// 診療：先找本區；本區客滿而另一區有空位就跨區支援；都滿了在本區排隊
+// 診療：先找本區；中重症本區客滿而另一區有空位就跨區支援；都滿了在本區排隊。輕症不跨區，在公共空間候診
 function wantTreat(a){
   const home=homeTreat(a),twin=TWIN[home];
   if(!has(home)){want(a,twin);return}
   const s=fit(a,home); if(s){takeSlot(a,home,s);return}
-  const alt=has(twin)&&fit(a,twin); if(alt){takeSlot(a,twin,alt);return}
+  const alt=a.cat!=='g'&&has(twin)&&fit(a,twin); if(alt){takeSlot(a,twin,alt);return}
   want(a,home);
 }
 function takeSlot(a,f,s){
@@ -991,7 +1045,7 @@ function goWait(a,f){
     const seat=fit(a,'public',true);
     if(seat){commit(seat);a.spot={kind:'seat',s:seat};setGoal(a,around(seat.r),'wait');return}
   }
-  const c=nearFree(sim.R[f].zones,a.str);
+  const c=nearFree(sim.R[f==='minor'&&has('public')?'public':f].zones,a.str);
   if(c){sim.stand[c[1]*map().W+c[0]]=a.id;a.spot={kind:'stand',c};setGoal(a,[c],'wait')}
 }
 function freeSpot(a){
@@ -1143,10 +1197,10 @@ function scanAlerts(){
   const cs=live.filter(a=>a.cs!=null&&sim.t-a.cs>180);
   if(cs.length)hit('carry','bad',cs.length,`${cs.length} 名擔架患者等人抬，最久 ${old(Math.max(...cs.map(a=>sim.t-a.cs)))} 分`,'擔架一趟要 2 人；救護車區、檢傷、中重傷區靠近一點，每趟就短','amb');
   const nw=live.filter(a=>a.noWay&&sim.t-a.noWay>60);
-  if(nw.length)hit('noway','bad',nw.length,`${nw.length} 名患者的路被擋住`,'擔架要 1 m 寬的走道，也不能穿過遺體、庫備品、廢棄物區',nw[0].useF);
+  if(nw.length)hit('noway','bad',nw.length,`${nw.length} 名患者的路被擋住`,'擔架要 1 m 寬的走道，也不能穿過遺體、庫備品、廢棄物區或封鎖線',nw[0].useF);
   const lane=(f,min,text,tip)=>{const q=sim.R[f].queue.filter(a=>!a.gone&&a.waitSince!=null&&sim.t-a.waitSince>60);if(q.length>=min)hit('q'+f,f==='major'?'bad':'warn',q.length,text(q.length),tip,f)};
   lane('major',1,n=>`中重傷區沒有空床，${n} 人在等`,'區塊拉大，或讓處置完的重症盡快到留觀區');
-  lane('minor',1,n=>`輕傷區沒有空位，${n} 人在等`,'輕傷區拉大，或留意是否被其他區的患者佔用');
+  lane('minor',1,n=>`輕傷區沒有空位，${n} 人在候診`,'輕傷區拉大，或留意是否被中重症佔用');
   lane('obs',1,n=>`留觀區客滿，${n} 人佔著診療床等待`,'留觀區太小會回堵診療區（指引 p.13）');
   lane('iso',1,n=>`隔離區客滿，${n} 人在等`,'隔離區要有獨立空間與動線（指引 p.14）');
   lane('triage',3,n=>`檢傷排隊 ${n} 人`,'把公共空間轉成檢傷擴充區（指引 p.12、p.15）');
@@ -1166,14 +1220,19 @@ function scanAlerts(){
   if(fresh('crossWaste'))hit('xwaste','warn',c.crossWaste,`廢棄物穿過公共空間或診療區 ${c.crossWaste} 次`,'廢棄物走獨立路線（指引 p.15）','waste');
   drawAlerts()}
 const liveAlerts=()=>[...sim.alerts.values()].filter(o=>sim.t-o.last<=ALERT_HOLD).sort((p,q)=>(p.level==='bad'?0:1)-(q.level==='bad'?0:1)||p.first-q.first);
-function drawAlerts(){alertLayer.innerHTML='';const done=new Set();
-  liveAlerts().forEach(o=>{const z=firstZone(o.f)||zones().find(q=>q.funcs.some(f=>TWIN[f]));if(!z||done.has(z.id))return;done.add(z.id);
-    const col=o.level==='bad'?'var(--bad)':'var(--hl)',x=z.x+z.w-.6,y=z.y+.6;
+const ALERT_TAG={rdoc:'等醫師',wdoc:'等醫師',rnur:'等護理師',carry:'等人抬',noway:'路被擋住',qmajor:'沒有空床',qminor:'沒有空位',qobs:'留觀客滿',qiso:'隔離客滿',qtriage:'檢傷排隊',qpharm:'藥局排隊',stand:'座位不夠',fetch:'等物資',stock:'斷貨',jobs:'後勤塞車',out:'停電',xiso:'傳染交叉',xbody:'遺體交叉',xwaste:'廢棄物交叉'};
+function drawAlerts(){alertLayer.innerHTML='';const by=new Map(),m=map(),fs=1.2;
+  liveAlerts().forEach(o=>{const z=firstZone(o.f)||zones().find(q=>q.funcs.some(f=>TWIN[f]));if(!z)return;if(!by.has(z.id))by.set(z.id,{z,l:[]});by.get(z.id).l.push(o)});
+  by.forEach(({z,l})=>{const col=l[0].level==='bad'?'var(--bad)':'var(--hl)',x=z.x+z.w-.6,y=z.y+.6;
     el('rect',{x:z.x,y:z.y,width:z.w,height:z.h,rx:.3,fill:'none',stroke:col,'stroke-width':.22,'stroke-dasharray':'.8 .5'},alertLayer);
+    const tags=[...new Set(l.map(o=>ALERT_TAG[o.key]))],s=tags.slice(0,2).join('、')+(tags.length>2?` +${tags.length-2}`:''),w=[...s].reduce((n,c)=>n+(c.charCodeAt(0)>255?fs:fs*.6),.8);
+    const px=x-1.25-w>=m.vx+.2?x-1.25-w:x+1.25;
+    el('rect',{x:px,y:y-1,width:w,height:2,rx:.4,fill:col,stroke:'#0b1d30','stroke-width':.1},alertLayer);
+    const lb=el('text',{x:px+w/2,y:y+.43,'text-anchor':'middle','font-size':fs+'px','font-weight':700,fill:'#0b1d30'},alertLayer);lb.textContent=s;
     el('circle',{cx:x,cy:y,r:1.15,fill:col,stroke:'#0b1d30','stroke-width':.14},alertLayer);
     const t=el('text',{x,y:y+.55,'text-anchor':'middle','font-size':'1.6px','font-weight':700,fill:'#0b1d30'},alertLayer);t.textContent='!'})}
 function alertsHTML(){const l=liveAlerts(),one=o=>`<li class="${o.level}"><b>${o.text}</b><span>${o.tip}</span></li>`;
-  return `<div class="sub">現場狀況</div>${l.length?`<ul class="alerts">${l.slice(0,4).map(one).join('')}</ul>${l.length>4?`<p class="desc">還有 ${l.length-4} 項</p>`:''}`:'<p class="desc">目前運作順暢。</p>'}`}
+  return `<div class="sub">現場狀況</div>${l.length?`<p class="desc">驚嘆號：紅＝卡住處置，黃＝要留意</p><ul class="alerts">${l.slice(0,4).map(one).join('')}</ul>${l.length>4?`<p class="desc">還有 ${l.length-4} 項</p>`:''}`:'<p class="desc">目前運作順暢。</p>'}`}
 function alertLog(){const l=[...sim.alerts.values()].sort((p,q)=>p.first-q.first);if(!l.length)return '<p class="desc">這一輪沒有偵測到異常。</p>';
   return `<ul class="alerts">${l.map(o=>`<li class="${o.level}"><b>${clock(o.first)}–${clock(o.last)}　${o.peakText}</b><span>${o.tip}</span></li>`).join('')}</ul>`}
 
@@ -1212,13 +1271,13 @@ const clock=t=>{const mm=Math.floor(t/60),h=8+Math.floor(mm/60);return `${String
 // ---- 控制 ----
 function startSim(){
   if(!zones().length){toast('先擺幾個功能區再開始模擬');return}
-  mode='sim'; selected=null; infoFunc=null; itemMode=null; document.body.classList.add('simming');
+  mode='sim'; selected=null; infoFunc=null; itemMode=null; tapeMode=false; selTape=null; document.body.classList.add('simming');
   const m=map();
   sim={t:0,speed:2,alerts:new Map(),seen:{},nextScan:0,running:true,ended:false,nextId:1,agents:[],sched:makeSchedule(),fields:new Map(),rnd:mulberry32(7),
     occ:new Int16Array(m.W*m.H),stand:new Int32Array(m.W*m.H),routes:new Map(),staffRoutes:new Map(),block:new Float32Array(m.W*m.H),
     stats:{arrived:0,triaged:0,treated:0,supported:0,discharged:0,transferred:0,deteriorated:0,stuck:0,noTreat:0,patientWalk:0,staffWalk:0,preempted:0,cross:0,crossIso:0,crossBody:0,crossWaste:0,carries:0,stockouts:0,supplyDelay:0,wasteDone:0,wasteLeft:0,waits:[]},showPat:false,showStaff:false};
   sim.R=buildResources(); sim.exits=exitCells();
-  const N=m.W*m.H,W=m.W; Object.assign(sim,{fp:new Uint8Array(N),aisle:new Uint8Array(N),wide:new Uint8Array(N),walk:new Uint8Array(N),slotCell:new Uint8Array(N),planCell:new Uint8Array(N),rw:new Uint8Array(N),rs:new Uint8Array(N),d0:new Int32Array(N),bq:new Int32Array(N),placed:new Set(),noFit:{},ver:0,serving:false,again:false});
+  const N=m.W*m.H,W=m.W; Object.assign(sim,{tape:new Uint8Array(N),fp:new Uint8Array(N),aisle:new Uint8Array(N),wide:new Uint8Array(N),walk:new Uint8Array(N),slotCell:new Uint8Array(N),planCell:new Uint8Array(N),rw:new Uint8Array(N),rs:new Uint8Array(N),d0:new Int32Array(N),bq:new Int32Array(N),placed:new Set(),noFit:{},ver:0,serving:false,again:false});
   for(let i=0;i<N;i++) sim.walk[i]=WALKABLE.has(m.g[(i/W)|0][i%W])?1:0;
   zones().forEach(z=>(z.items||[]).forEach(it=>itemCells(it).forEach(([x,y])=>{sim.walk[y*W+x]=0;sim.fp[y*W+x]=1})));
   for(const k in sim.R) sim.R[k].slots.forEach(s=>sim.slotCell[s.y*W+s.x]=1);
@@ -1398,13 +1457,14 @@ let clearArmed=false,clearT;
 $('#clearMap').onclick=ev=>{
   if(mode==='sim'||!zones().length) return;
   if(!clearArmed){clearArmed=true;ev.target.textContent='再按一次確認清空';clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;ev.target.textContent='清空本圖'},2500);return}
-  clearArmed=false;ev.target.textContent='清空本圖';state.layouts[state.mapId]=[];selected=null;drawZones();toast('已清空');
+  clearArmed=false;ev.target.textContent='清空本圖';state.layouts[state.mapId]=[];state.tapes[state.mapId]=[];selected=null;selTape=null;drawZones();toast('已清空');
 };
 window.addEventListener('resize',()=>applyZoom());
 
 function start(data){
   load(); if(data&&data.layouts&&data.v===2) state=Object.assign(state,data);
   MAPS.forEach(m=>state.layouts[m.id]=(state.layouts[m.id]||[]).filter(z=>z.x>=m.vx&&z.y>=m.vy&&z.x+z.w<=m.W&&z.y+z.h<=m.H&&!zoneCells(z).some(([x,y])=>'WT'.includes(m.g[y][x]))));   // 地圖改過後，超出範圍或壓到牆的區塊拿掉
+  MAPS.forEach(m=>joinZones(state.layouts[m.id]));
   renderTabs(); drawBase(); drawZones();
   let seen=false;try{seen=!!localStorage.getItem('mrs-tut-v1')}catch(e){} if(!seen){tutI=0;tutShow()}
 }
