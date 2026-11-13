@@ -73,7 +73,7 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 
 /* 地圖 */
 .mapwrap{position:relative;background:var(--panel);border:1px solid var(--panel-line);border-radius:8px;overflow:auto;min-height:0;touch-action:none}
-.mapwrap svg{display:block}
+.mapwrap svg{display:block;margin:0 auto}
 .scale{position:sticky;left:8px;bottom:8px;display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11px;color:var(--chalk-dim);background:var(--scale-bg);padding:3px 8px;border-radius:4px;margin:0 0 8px 8px}
 .scale i{display:inline-block;height:6px;border:1px solid var(--chalk-dim);border-top:none}
 
@@ -328,7 +328,7 @@ function mapUnderground(){
   [25,33,41,49].forEach(x=>{fill(g,x,13,x+1,14,'P');fill(g,x,23,x+1,24,'P')});
   fill(g,52,5,56,10,'T');
   const feats={'19,5':'outlet','38,5':'outlet','38,32':'outlet','55,32':'outlet'};
-  return {id:'underground',tab:'地下空間',W,H,vx,vy,g0:g,g,arrive:[8,18],staffStart:[11,29],feats,dim:{x:19,y:5,w:38,h:28,top:3.5,side:12.5,gap:[17.2,20.2],sideT:11},rooms:[{name:'地下開放空間（約 80 坪）',x:19,y:5,w:38,h:28,big:1},{name:'廁所',x:52,y:5,w:5,h:6,small:1}],
+  return {id:'underground',tab:'地下空間',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[8,18],staffStart:[11,29],feats,dim:{x:19,y:5,w:38,h:28,top:3.5,side:12.5,gap:[17.2,20.2],sideT:11},rooms:[{name:'地下開放空間（約 80 坪）',x:19,y:5,w:38,h:28,big:1},{name:'廁所',x:52,y:5,w:5,h:6,small:1}],
     outLabels:[{t:'地面',x:13,y:32}],
     entrances:[{x:18,y:18.5,t:'唯一樓梯',side:'w'}],
     scenario:'空襲警報期間，急救站移入地下停車場改建的避難空間。整個空間只有一座樓梯通往地面。',
@@ -647,7 +647,7 @@ function drawDim(m){const d=m.dim,g=el('g',{class:'dim'},svg),line=(x1,y1,x2,y2)
   label(d.x+d.w/2,d.top,meters(d.w)+' m');label(d.side,d.sideT??d.y+d.h/2,meters(d.h)+' m',true)}
 function drawBase(){
   const m=map(); svg.innerHTML='';
-  svg.setAttribute('viewBox',`${m.vx} ${m.vy} ${m.vw??m.W-m.vx} ${m.vh??m.H-m.vy}`);
+  const pd=m.pad||0;svg.setAttribute('viewBox',`${m.vx-pd} ${m.vy-pd} ${(m.vw??m.W-m.vx)+2*pd} ${(m.vh??m.H-m.vy)+2*pd}`);
   const defs=el('defs',{},svg);
   const pat=el('pattern',{id:'hatch',width:.9,height:.9,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'},defs);
   el('line',{x1:0,y1:0,x2:0,y2:.9,stroke:'var(--m-hatch)','stroke-width':.14},pat);
@@ -657,7 +657,7 @@ function drawBase(){
   const CLS={F:'c-floor',D:'c-floor',S:'c-floor',M:'c-floor',B:'c-floor',G:'c-ground',R:'c-road',W:'c-wall',P:'c-pillar',T:'c-toilet',X:'c-xray',N:'c-tent',O:'c-obst'};
   const op=el('pattern',{id:'obstp',width:1,height:1,patternUnits:'userSpaceOnUse'},defs);el('path',{d:'M.2 .2L.8 .8M.8 .2L.2 .8',stroke:'var(--m-obstx)','stroke-width':.09},op);
   // 同一列相鄰同色的格子併成一塊畫，元素數量才不會隨格子變細而暴增
-  for(let y=0;y<m.H;y++)for(let x=0;x<m.W;){const c=m.g[y][x];let e=x+1;while(e<m.W&&m.g[y][e]===c)e++;
+  for(let y=Math.max(0,m.vy);y<m.H;y++)for(let x=Math.max(0,m.vx);x<m.W;){const c=m.g[y][x];let e=x+1;while(e<m.W&&m.g[y][e]===c)e++;
     el('rect',{x,y,width:e-x+.01,height:1.01,class:CLS[c]},baseLayer);
     if(c==='G') el('rect',{x,y,width:e-x,height:1,fill:'url(#hatch)'},baseLayer);
     if(c==='F') el('rect',{x,y,width:e-x,height:1,fill:'url(#gridp)'},baseLayer);
@@ -745,7 +745,7 @@ function drawZones(){
 function applyZoom(){
   const m=map(); const availW=wrap.clientWidth-2, availH=wrap.clientHeight-2;
   const narrow=window.matchMedia('(max-width:1100px)').matches;
-  const vw=m.vw??m.W-m.vx,vh=m.vh??m.H-m.vy,fit=narrow?availW/vw:Math.min(availW/vw, availH/vh);
+  const pd=2*(m.pad||0),vw=(m.vw??m.W-m.vx)+pd,vh=(m.vh??m.H-m.vy)+pd,fit=narrow?availW/vw:Math.min(availW/vw, availH/vh);
   const cs=Math.max(3,fit*state.zoom);
   svg.setAttribute('width',Math.round(vw*cs)); svg.setAttribute('height',Math.round(vh*cs));
   $('#scalebar').style.width=Math.round(cs)+'px';
@@ -1077,7 +1077,7 @@ const PARAM_TEXT = [
   '電力：每區接最近插座，2 m 內直接插，否則拉延長線（最多 5 條、每條 30 m、每個插座接 2 區）；沒電的區處置時間 ×1.3（照明與設備不足）；延長線經過處擔架速度 ×0.6、步行 ×0.85；插座不夠或太遠時改接發電機（每台供 4 區，一樣要拉延長線）',
   '帳篷：方形或圓形（正圓、橢圓），大小自由、數量不限；外圍 0.5 m 是帳篷布與營釘，不能擺東西也不能走；門寬可設 0.5 m 起，預設 1 m，開在每邊中間',
   '各區起始物資：藥品 6、衛材 8、重症設備 2；低於三分之一補貨；斷貨時 3 分鐘後臨時變通',
-  'BORP 關：MCI 的 4 名重症中，先到的 3 名需要損傷控制手術，但只開 1 台刀（焜哥 2026-11-09），其餘 2 名照一般重症流程穩定後後送。開刀流程：檢傷 → BORP 檢傷分類區術前評估 10 分 → 手術 80 分 → 術後恢復 10 分 → 救護車後送；沒擺 BORP 檢傷分類區就直接進手術室，沒擺術後恢復區就到留觀區，都沒有就在手術台上恢復',
+  'BORP 關：MCI 的 4 名重症中，先到的 3 名需要損傷控制手術，但只開 1 台刀（焜哥 2026-11-09），其餘 2 名在時限內來不及開刀，照一般重症流程穩定後轉送。開刀流程：檢傷 → BORP 檢傷分類區術前評估 10 分 → 手術 80 分 → 術後恢復 10 分 → 救護車後送；沒擺 BORP 檢傷分類區就直接進手術室，沒擺術後恢復區就到留觀區，都沒有就在手術台上恢復',
   'BORP 關：手術組（外科、骨科、麻醉）3 人全程；術前評估需急診醫師＋急診護理師；術後恢復需 1 名護理師全程。手術室每 7 坪 1 張手術台，BORP 檢傷分類區、術後恢復區每 2 坪 1 床',
   'BORP 關：BORP 9 人一開始就在站內（附件二十四）；空閒時可支援一般區（外、骨、麻當醫師用，衛勤抬擔架、做後勤），BORP 有病人時叫回來，原本的患者改等其他人',
   'BORP 關：手術室是無菌區，患者與擔架不能穿過，也不能和其他功能合併',
@@ -1881,13 +1881,13 @@ function borpNotes(note,walkFrom){const s=sim.stats,or=firstZone('or'),bt=firstZ
   if(pa){const d=walkFrom(or,pa);if(d&&d>15)note(`手術室到術後恢復區約 ${Math.round(d)} m`,'剛開完刀的患者移動距離越短越安全','指引圖 3、圖 4：相鄰配置；15 m 為遊戲假設')}
   if(mo){const d=walkFrom(or,mo);if(d!=null&&d<=3)note('手術室緊鄰遺體區','感染管制與家屬動線互相干擾','遊戲假設：指引圖 3 兩區相鄰，實務上建議分開')}
   if(map().id==='underground')note('手術室設在地下空間','密閉空間通風排氣不易維持，後送也只能走樓梯','指引 p.24：相對密閉但能通風排氣、靠近車輛動線');
-  if(s.surgOut)note(`另有 ${s.surgOut} 名需要手術的重症先穩定後後送`,'1 組 BORP 一次只能開 1 台刀，其餘要靠後送分流','指引 p.27：BORP 量能與後送')}
+  if(s.surgOut)note(`另有 ${s.surgOut} 名需要手術的重症在時限內來不及開刀，先穩定後轉送`,'1 組 BORP 一次只能開 1 台刀，其餘要靠後送分流','指引 p.27：BORP 量能與後送')}
 function resultHTML(e){return `<div class="stars" aria-label="${e.stars} 星">${'★'.repeat(e.stars)}<i>${'★'.repeat(3-e.stars)}</i></div>
   <table class="res"><tbody>${e.ind.map(i=>`<tr class="${i.ok?'':'no'}"><td>${i.n}</td><td>${i.v} ${i.u}</td><td>${i.gt||`目標 ${i.g} 內`}</td></tr>`).join('')}</tbody></table>
   <div class="sub">回饋</div>${e.notes.map(n=>`<div class="fb"><b>${n.what}</b><span>${n.why}</span>${n.ref?`<small>${n.ref}</small>`:''}</div>`).join('')}`}
 async function downloadCard(){const e=evaluate(),m=map(),t=clock(sim.t),clone=svg.cloneNode(true);
   const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n');
-  const html=`<!doctype html><meta charset="utf-8"><title>急救站結果卡</title><style>${css}html,body{height:auto;overflow:auto}.card-out{max-width:980px;margin:16px auto;padding:0 16px}</style><div class="card-out"><h1 style="font-family:var(--f-display)">急救站結果卡・${esc(m.title||m.tab)}</h1>${clone.outerHTML}${resultHTML(e)}</div>`;
+  const html=`<!doctype html><html${isDark()?' data-theme="dark"':''}><meta charset="utf-8"><title>急救站結果卡</title><style>${css}html,body{height:auto;overflow:auto}.card-out{max-width:980px;margin:16px auto;padding:0 16px}</style><div class="card-out"><h1 style="font-family:var(--f-display)">急救站結果卡・${esc(m.title||m.tab)}</h1>${clone.outerHTML}${resultHTML(e)}</div>`;
   const filename=`急救站結果卡_${(m.title||m.tab).replace(/[\\/:*?"<>|]/g,'')}.html`,dl=window.claude?.use?await window.claude.use('downloads'):null;
   if(dl){try{await dl.save({filename,data:html});toast('已下載結果卡')}catch(err){if(err.code!=='declined')toast('這個環境無法下載結果卡')}return}
   // 不在 artifact 裡（本機檔案、GitHub Pages）時直接下載
