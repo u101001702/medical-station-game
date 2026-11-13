@@ -450,9 +450,21 @@ const ED_TOOLS=[
   ['bgmove','移動底圖','拖曳移動照片的位置','#c9d65b',1],
   ['measure','量比例尺','在照片上沿著一段已知長度拖一條線，再到右側填實際幾公尺','#c9d65b',1],
 ];
-let edTool='room', edUndo=[], edMeasure=null, edClearArmed=false;
+let edTool='room', edUndo=[], edMeasure=null, edClearArmed=false, edPresetArmed=false;
 const isEditing=()=>state.mapId==='custom'&&!!state.custom&&!!state.custom.editing;
-function newCustom(){const W=60,H=40;state.custom={W,H,g:Array.from({length:H},()=>'G'.repeat(W)),feats:{},arrive:null,rooms:[],name:'',scenario:'',facts:'',bg:null,bgShow:false,editing:true}}
+// 範本場地：長方形大廳（焜哥 2026-11-14 提供：17.8 × 14.8 m，中間無柱；上方 2.5 m 大門，下方左右各 1 m 小門，都是平面；四面牆各 2 個插座；左下角廁所，廁所外有水槽）
+// 格子 0.5 m，室內畫成 36 × 30 格（18 × 15 m）；大門外留 3 m 空地（剛好停救護車）再接道路，兩側與後方只留 0.5 m（焜哥 11-14：外圍草地縮小 80%）
+function presetHall(){const W=40,H=41,g=Array.from({length:H},()=>Array(W).fill('G')),fill=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)g[y][x]=c};
+  fill(0,0,W-1,1,'R');fill(1,8,38,39,'W');fill(2,9,37,38,'F');
+  fill(17,8,21,8,'D');fill(9,39,10,39,'D');fill(29,39,30,39,'D');
+  fill(2,35,5,38,'T');fill(6,35,6,38,'W');fill(2,34,5,34,'W');
+  const feats={'2,33':'sink'};[[8,9],[31,9],[14,38],[25,38],[2,16],[2,27],[37,16],[37,27]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
+  return {W,H,g:g.map(r=>r.join('')),feats,arrive:[34,1],rooms:[{name:'大廳',x:2,y:9,w:36,h:30},{name:'廁所',x:2,y:35,w:4,h:4}],
+    name:'長方形大廳',scenario:'在一間長方形大廳開設急救站。大門朝向道路，救護車從道路進來。',
+    facts:'室內實際約 17.8 × 14.8 m（地圖以 0.5 m 一格畫成 18 × 15 m）\n空間中間沒有柱子\n上方大門寬 2.5 m，下方左右各一個 1 m 小門，三個門擔架都推得過\n左下角有一間廁所，廁所外有水槽\n四面牆各有 2 個插座\n大門外到道路約 3 m 空地，其他三面緊鄰建築外牆',
+    bg:null,bgShow:false,editing:false}}
+function newCustom(){state.custom=presetHall()}
+function newBlank(){const W=60,H=40;state.custom={W,H,g:Array.from({length:H},()=>'G'.repeat(W)),feats:{},arrive:null,rooms:[],name:'',scenario:'',facts:'',bg:null,bgShow:false,editing:true}}
 function roomValid(g,r){let n=0;for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(g[y]&&g[y][x]==='F')n++;return r.w>=2&&r.h>=2&&n>=r.w*r.h*.6}
 function mapCustom(){const c=state.custom,W=c.W,H=c.H,g=c.g.map(r=>r.split(''));
   const fl=c.g.join('').split('F').length-1,outs=Object.values(c.feats).filter(v=>v==='outlet').length;
@@ -568,7 +580,7 @@ function renderEditInfo(){const c=state.custom,ch=editChecks(),info=$('#info');$
         <div class="acts"><button class="tbtn" type="button" id="edBgUp">換一張</button><button class="tbtn danger" type="button" id="edBgDel">移除底圖</button></div>`
        :`<p class="desc">可以放現場照片、空拍圖或平面圖當底圖，照著描。圖只存在這台裝置的瀏覽器裡，不會上傳。</p><div class="acts"><button class="tbtn" type="button" id="edBgUp">選擇圖片</button></div>`}
     </div>
-    <div class="acts"><button class="tbtn danger" type="button" id="edClear">${edClearArmed?'再按一次確認清空':'清空場地'}</button></div>`}
+    <div class="acts"><button class="tbtn" type="button" id="edPreset">${edPresetArmed?'再按一次確認載入':'載入範本：長方形大廳'}</button><button class="tbtn danger" type="button" id="edClear">${edClearArmed?'再按一次確認清空':'清空場地'}</button></div>`}
 
 function save(){try{localStorage.setItem('mrs-layout-v2',JSON.stringify(state));return true}catch(e){return false}}
 function load(){try{const s=JSON.parse(localStorage.getItem('mrs-layout-v2')||'null');if(s&&s.layouts)state=Object.assign(state,s)}catch(e){}}
@@ -992,6 +1004,8 @@ $('#info').addEventListener('click',ev=>{
     if(id==='edMeasNo'){edMeasure=null;drawEdLayer();renderInfo();return}
     if(id==='edMeasOK'){const v=+$('#edMeasM').value,bg=c.bg,mm=edMeasure;if(!(v>0)||!bg||!mm){toast('先填實際長度（公尺）');return}
       const L=Math.hypot(mm.x2-mm.x1,mm.y2-mm.y1),k=v/CELL_M/L;bg.x=mm.x1+(bg.x-mm.x1)*k;bg.y=mm.y1+(bg.y-mm.y1)*k;bg.w*=k;bg.h*=k;edMeasure=null;save();drawBase();drawZones();toast(`底圖已縮放成實際大小（${v} m）`);return}
+    if(id==='edPreset'){if(!edPresetArmed){edPresetArmed=true;renderInfo();setTimeout(()=>{edPresetArmed=false;if(isEditing())renderInfo()},2500);return}
+      edPresetArmed=false;edSnap();const p=presetHall();Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,name:p.name,scenario:p.scenario,facts:p.facts});edRefresh();applyZoom();toast('已載入範本場地（可以復原），按「完成場地」開始佈置');return}
     if(id==='edClear'){if(!edClearArmed){edClearArmed=true;renderInfo();setTimeout(()=>{edClearArmed=false;if(isEditing())renderInfo()},2500);return}
       edClearArmed=false;edSnap();c.g=Array.from({length:c.H},()=>'G'.repeat(c.W));c.feats={};c.rooms=[];c.arrive=null;edRefresh();toast('已清空場地（可以復原）');return}
     return}
