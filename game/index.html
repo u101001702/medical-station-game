@@ -334,7 +334,38 @@ function mapUnderground(){
     scenario:'空襲警報期間，急救站移入地下停車場改建的避難空間。整個空間只有一座樓梯通往地面。',
     facts:['室內 19 × 14 m','唯一出入口是西側樓梯，擔架必須以人力抬上抬下','空間內沒有隔間，只有柱子','廁所在東北角','整個空間只有 4 個插座','發電機、救護車只能放在樓梯口外的地面']};
 }
-const BUILTIN = [mapClassroom(), mapHealth(), mapUnderground()];
+// 長方形大廳（焜哥 2026-11-14 提供：17.8 × 14.8 m，中間無柱；只有上方 2.5 m 大門〔11-15 更正，無下方小門〕；四面牆各 2 個插座；左下角廁所，廁所外有水槽）
+// 0.5 m 一格，室內畫成 36 × 30 格（18 × 15 m）；大門外 3 m 空地再接道路，兩側與後方只留 0.5 m（11-14：外圍草地縮小 80%）
+// 原本放在「自訂場地」當範本，11-14 焜哥要求改成獨立分頁
+function mapHall(){
+  const W=40,H=41,vx=0,vy=0,g=grid(W,H,'G');
+  fill(g,0,0,W-1,1,'R');fill(g,1,8,38,39,'W');fill(g,2,9,37,38,'F');
+  fill(g,17,8,21,8,'D');
+  fill(g,2,35,5,38,'T');fill(g,6,35,6,38,'W');fill(g,2,34,5,34,'W');
+  const feats={'2,33':'sink'};[[8,9],[31,9],[14,38],[25,38],[2,16],[2,27],[37,16],[37,27]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
+  return {id:'hall',tab:'長方形大廳',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[34,1],feats,rooms:[{name:'大廳',x:2,y:9,w:36,h:30},{name:'廁所',x:2,y:35,w:4,h:4,small:1}],
+    dim:{x:2,y:9,w:36,h:30,top:5.6,side:-1.4},
+    outLabels:[{t:'道路',x:2,y:1.4},{t:'大門外空地',x:2,y:3.9}],
+    entrances:[{x:19,y:8,t:'大門（2.5 m）',side:'n'}],
+    scenario:'在一間長方形大廳開設急救站。大門朝向道路，救護車從道路進來。',
+    facts:['室內實際約 17.8 × 14.8 m（地圖以 0.5 m 一格畫成 18 × 15 m）','空間中間沒有柱子','唯一出入口是上方大門，寬 2.5 m，平面，擔架推得過','左下角有一間廁所，廁所外有水槽','四面牆各有 2 個插座','大門外到道路約 3 m 空地，其他三面緊鄰建築外牆']};
+}
+// 長條場地（焜哥 2026-11-14 提供：14 × 5.5 m；上方長邊靠兩端各一個 1 m 門，門外是走廊；四個角落各 2 個插座；無廁所、水槽、柱子）
+// 11-14 更正：患者入口是走廊上方正中間的斜坡，走廊右端不開口。走廊寬 2 m、斜坡寬 2 m、斜坡外 3.5 m 空地接道路是暫定
+function mapStrip(){
+  const W=32,H=28,vx=0,vy=0,g=grid(W,H,'G');
+  fill(g,0,0,W-1,1,'R');fill(g,1,9,30,26,'W');fill(g,2,10,29,13,'F');fill(g,2,15,29,25,'F');
+  fill(g,14,9,17,9,'M');fill(g,3,14,4,14,'D');fill(g,27,14,28,14,'D');
+  const feats={};[[6,15],[2,17],[25,15],[29,17],[5,25],[2,23],[26,25],[29,23]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
+  return {id:'strip',tab:'長條場地',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[26,1],feats,rooms:[{name:'長條場地',x:2,y:15,w:28,h:11}],
+    dim:{x:2,y:15,w:28,h:11,top:5.4,side:-1.4},
+    corridor:{t:'走廊（長 14 m、寬 2 m）',x:16,y:12.6},
+    outLabels:[{t:'道路',x:2,y:1.4},{t:'空地',x:2,y:3.8}],
+    entrances:[{x:15.5,y:9,t:'斜坡（患者入口）',side:'n'}],
+    scenario:'在一間長條形的房間開設急救站。患者從走廊中間的斜坡進來，再從兩個小門進房間。',
+    facts:['室內 14 × 5.5 m，中間沒有柱子','房間上方長邊靠左、靠右各一個 1 m 寬的門，通往走廊','走廊（暫定寬 2 m）兩端不通，唯一出入口是走廊上方正中間的斜坡','斜坡擔架推得過，外面是空地和道路','四個角落各有 2 個插座','沒有廁所、沒有水槽']};
+}
+const BUILTIN = [mapClassroom(), mapHealth(), mapUnderground(), mapHall(), mapStrip()];
 const MAPBY = Object.fromEntries(BUILTIN.map(m=>[m.id,m]));
 const allMaps = ()=>MAPBY.custom?[...BUILTIN,MAPBY.custom]:BUILTIN;
 
@@ -342,7 +373,7 @@ const allMaps = ()=>MAPBY.custom?[...BUILTIN,MAPBY.custom]:BUILTIN;
 let state = {v:2, mapId:'classroom', layouts:{classroom:[],health:[],underground:[],custom:[]}, tapes:{classroom:[],health:[],underground:[],custom:[]}, tents:{classroom:[],health:[],underground:[],custom:[]}, custom:null, nextId:1, zoom:1};
 // 一般關與第三類（BORP）關各存一份配置；BORP 那份第一次打開時複製一般關的配置
 const LK=id=>id+(state.borp?'@b':'');
-function ensureState(){state.tents=state.tents||{};['classroom','health','underground','custom'].flatMap(id=>[id,id+'@b']).forEach(id=>{state.layouts[id]=state.layouts[id]||[];state.tapes[id]=state.tapes[id]||[];state.tents[id]=state.tents[id]||[]})}
+function ensureState(){state.tents=state.tents||{};['classroom','health','underground','hall','strip','custom'].flatMap(id=>[id,id+'@b']).forEach(id=>{state.layouts[id]=state.layouts[id]||[];state.tapes[id]=state.tapes[id]||[];state.tents[id]=state.tents[id]||[]})}
 let selected = null;     // zone id
 let infoFunc = null;     // 點卡片時顯示說明
 const $ = s=>document.querySelector(s);
@@ -450,21 +481,9 @@ const ED_TOOLS=[
   ['bgmove','移動底圖','拖曳移動照片的位置','#c9d65b',1],
   ['measure','量比例尺','在照片上沿著一段已知長度拖一條線，再到右側填實際幾公尺','#c9d65b',1],
 ];
-let edTool='room', edUndo=[], edMeasure=null, edClearArmed=false, edPresetArmed=false;
+let edTool='room', edUndo=[], edMeasure=null, edClearArmed=false;
 const isEditing=()=>state.mapId==='custom'&&!!state.custom&&!!state.custom.editing;
-// 範本場地：長方形大廳（焜哥 2026-11-14 提供：17.8 × 14.8 m，中間無柱；上方 2.5 m 大門，下方左右各 1 m 小門，都是平面；四面牆各 2 個插座；左下角廁所，廁所外有水槽）
-// 11-15 焜哥更正：只有上方大門，沒有下方兩個小門
-// 格子 0.5 m，室內畫成 36 × 30 格（18 × 15 m）；大門外留 3 m 空地（剛好停救護車）再接道路，兩側與後方只留 0.5 m（焜哥 11-14：外圍草地縮小 80%）
-function presetHall(){const W=40,H=41,g=Array.from({length:H},()=>Array(W).fill('G')),fill=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)g[y][x]=c};
-  fill(0,0,W-1,1,'R');fill(1,8,38,39,'W');fill(2,9,37,38,'F');
-  fill(17,8,21,8,'D');
-  fill(2,35,5,38,'T');fill(6,35,6,38,'W');fill(2,34,5,34,'W');
-  const feats={'2,33':'sink'};[[8,9],[31,9],[14,38],[25,38],[2,16],[2,27],[37,16],[37,27]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
-  return {W,H,g:g.map(r=>r.join('')),feats,arrive:[34,1],rooms:[{name:'大廳',x:2,y:9,w:36,h:30},{name:'廁所',x:2,y:35,w:4,h:4}],
-    name:'長方形大廳',pv:2,scenario:'在一間長方形大廳開設急救站。大門朝向道路，救護車從道路進來。',
-    facts:'室內實際約 17.8 × 14.8 m（地圖以 0.5 m 一格畫成 18 × 15 m）\n空間中間沒有柱子\n唯一出入口是上方大門，寬 2.5 m，平面，擔架推得過\n左下角有一間廁所，廁所外有水槽\n四面牆各有 2 個插座\n大門外到道路約 3 m 空地，其他三面緊鄰建築外牆',
-    bg:null,bgShow:false,editing:false}}
-function newCustom(){state.custom=presetHall()}
+function newCustom(){newBlank()}
 function newBlank(){const W=60,H=40;state.custom={W,H,g:Array.from({length:H},()=>'G'.repeat(W)),feats:{},arrive:null,rooms:[],name:'',scenario:'',facts:'',bg:null,bgShow:false,editing:true}}
 function roomValid(g,r){let n=0;for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(g[y]&&g[y][x]==='F')n++;return r.w>=2&&r.h>=2&&n>=r.w*r.h*.6}
 function mapCustom(){const c=state.custom,W=c.W,H=c.H,g=c.g.map(r=>r.split(''));
@@ -581,7 +600,7 @@ function renderEditInfo(){const c=state.custom,ch=editChecks(),info=$('#info');$
         <div class="acts"><button class="tbtn" type="button" id="edBgUp">換一張</button><button class="tbtn danger" type="button" id="edBgDel">移除底圖</button></div>`
        :`<p class="desc">可以放現場照片、空拍圖或平面圖當底圖，照著描。圖只存在這台裝置的瀏覽器裡，不會上傳。</p><div class="acts"><button class="tbtn" type="button" id="edBgUp">選擇圖片</button></div>`}
     </div>
-    <div class="acts"><button class="tbtn" type="button" id="edPreset">${edPresetArmed?'再按一次確認載入':'載入範本：長方形大廳'}</button><button class="tbtn danger" type="button" id="edClear">${edClearArmed?'再按一次確認清空':'清空場地'}</button></div>`}
+    <div class="acts"><button class="tbtn danger" type="button" id="edClear">${edClearArmed?'再按一次確認清空':'清空場地'}</button></div>`}
 
 function save(){try{localStorage.setItem('mrs-layout-v2',JSON.stringify(state));return true}catch(e){return false}}
 function load(){try{const s=JSON.parse(localStorage.getItem('mrs-layout-v2')||'null');if(s&&s.layouts)state=Object.assign(state,s)}catch(e){}}
@@ -1005,8 +1024,6 @@ $('#info').addEventListener('click',ev=>{
     if(id==='edMeasNo'){edMeasure=null;drawEdLayer();renderInfo();return}
     if(id==='edMeasOK'){const v=+$('#edMeasM').value,bg=c.bg,mm=edMeasure;if(!(v>0)||!bg||!mm){toast('先填實際長度（公尺）');return}
       const L=Math.hypot(mm.x2-mm.x1,mm.y2-mm.y1),k=v/CELL_M/L;bg.x=mm.x1+(bg.x-mm.x1)*k;bg.y=mm.y1+(bg.y-mm.y1)*k;bg.w*=k;bg.h*=k;edMeasure=null;save();drawBase();drawZones();toast(`底圖已縮放成實際大小（${v} m）`);return}
-    if(id==='edPreset'){if(!edPresetArmed){edPresetArmed=true;renderInfo();setTimeout(()=>{edPresetArmed=false;if(isEditing())renderInfo()},2500);return}
-      edPresetArmed=false;edSnap();const p=presetHall();Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,name:p.name,scenario:p.scenario,facts:p.facts,pv:p.pv});edRefresh();applyZoom();toast('已載入範本場地（可以復原），按「完成場地」開始佈置');return}
     if(id==='edClear'){if(!edClearArmed){edClearArmed=true;renderInfo();setTimeout(()=>{edClearArmed=false;if(isEditing())renderInfo()},2500);return}
       edClearArmed=false;edSnap();c.g=Array.from({length:c.H},()=>'G'.repeat(c.W));c.feats={};c.rooms=[];c.arrive=null;edRefresh();toast('已清空場地（可以復原）');return}
     return}
@@ -1078,6 +1095,7 @@ const PARAM_TEXT = [
   '輕症 10% 於處置後轉重症：改躺、用擔架移到重傷區（等床時留在原位），再照重症處置與轉出',
   '留觀：中症 30 分、重症 20 分後轉出；中症一半需要留觀，留觀中 10% 惡化轉出',
   '佔地：坐 1 × 1 m，躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺；疑似傳染躺',
+  '重傷區躺床的頭端（短邊）外要留 0.5 m，不和別床共用（焜哥臨床慣例），所以重傷區每排床之間隔 1 m',
   '重症長邊外側要留 0.5 m 走道，兩床可共用；患者是障礙物不能跨越，擺放時一定留出通道（擔架 1 m、步行 0.5 m）',
   '檢傷 2 坪、藥局窗口 2 坪、遺體 1.25 坪各一位',
   '面積連一個位子都不夠時，仍運作 1 個位子，但處置時間 ×1.8',
@@ -1191,6 +1209,7 @@ function stillOpen(pl){
   const near=(r,arr)=>around(r).some(([x,y])=>arr[y*W+x]);
   let ok=near(pl.r,pl.str?s:w);
   if(ok&&pl.strip) ok=pl.strip.every(([x,y])=>w[y*W+x]);
+  if(ok&&pl.head) ok=pl.head.some(([x,y])=>w[y*W+x]);
   if(ok) ok=sim.exits.every(([x,y])=>w[y*W+x]);
   if(ok) ok=sim.anchors.every(i=>s[i])&&sim.gates.every(l=>l.some(i=>s[i]));
   if(ok) for(const o of sim.placed){if(!near(o.r,o.str&&!o.a.seated?s:w)){ok=false;break}}
@@ -1199,10 +1218,11 @@ function stillOpen(pl){
   markFp(pl.r,0);computeWide();return ok}
 // 開場依區塊排好床位、座位：床 1×2 m 成排、床間 0.5 m，兩排床夾一條走道；座位 4 張一組
 const BED_F=['major','mid','obs','iso'], GRID_F=[...SPACE_F,'public'];
-function gridBands(S,d,gap,lead){const t=[];let p=lead?gap:0,pair=0;
-  while(p+d<=S){t.push(p);p+=d+(pair++%2?0:gap)}return t}
-function gridRects(z,bed,horiz,gap,lead,end){
-  const L=horiz?z.w:z.h,S=horiz?z.h:z.w,d=bed?2*CM:CM,bands=gridBands(S,d,gap,lead).slice(0,!bed&&Math.min(z.w,z.h)<6?1:99),out=[];if(!bands.length)return out;
+// head：重傷區每排床之間都隔 1 m，床頭兩端才留得出各自的 0.5 m
+function gridBands(S,d,gap,lead,head){const t=[];let p=lead?gap:0,pair=0;
+  while(p+d<=S){t.push(p);p+=d+(head?2:(pair++%2?0:gap))}return t}
+function gridRects(z,bed,horiz,gap,lead,end,head){
+  const L=horiz?z.w:z.h,S=horiz?z.h:z.w,d=bed?2*CM:CM,bands=gridBands(S,d,gap,lead,head).slice(0,!bed&&Math.min(z.w,z.h)<6?1:99),out=[];if(!bands.length)return out;
   const off=end?S-bands[bands.length-1]-d:0,along=[];
   for(let i=0;;i++){const p=bed?i*(CM+1):i*CM+(i>>2);if(p+CM>L)break;along.push(p)}
   const offL=end&&along.length?L-along[along.length-1]-CM:0;
@@ -1220,9 +1240,10 @@ function gridTry(rects,needStr){const W=map().W,kept=[],w=sim.rw,s=sim.rs,near=(
   kept.forEach(r=>{score+=needStr&&near(r,s)?2:1;markFp(r,0)});computeWide();return {kept,score}}
 function gridBest(z,bed,needStr){let best=null;
   const narrow=!bed&&Math.min(z.w,z.h)<6;   // 窄走廊的座位只排一列，貼牆順著走，留出擔架通道
+  const head=bed&&z.funcs.includes('major');
   for(const horiz of [true,false])for(const gap of [2,1])for(const lead of [false,true])for(const end of [false,true]){
     if(narrow&&(horiz!==(z.w>=z.h)||lead))continue;
-    const t=gridTry(gridRects(z,bed,horiz,gap,lead,end),needStr);if(!best||t.score>best.score)best=t}
+    const t=gridTry(gridRects(z,bed,horiz,gap,lead,end,head),needStr);if(!best||t.score>best.score)best=t}
   return best}
 function buildPlan(){const W=map().W,zs=zones().filter(z=>z.funcs.some(f=>GRID_F.includes(f))),rank=z=>Math.min(...z.funcs.map(f=>GRID_F.includes(f)?GRID_F.indexOf(f):9));
   zs.sort((p,q)=>rank(p)-rank(q));
@@ -1244,6 +1265,9 @@ function drawPlan(){sim.plan.forEach(r=>{el('rect',{x:r.x+.06,y:r.y+.06,width:r.
 function bedStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,sides=w>h?[[...Array(w).keys()].map(i=>[x+i,y-1]),[...Array(w).keys()].map(i=>[x+i,y+h])]:[[...Array(h).keys()].map(i=>[x-1,y+i]),[...Array(h).keys()].map(i=>[x+w,y+i])];
   const ok=sides.filter(st=>st.every(([u,v])=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u]));
   return ok.find(st=>st.some(([u,v])=>sim.aisle[v*W+u]))||ok[0]}
+// 重傷區躺床：床頭（短邊）外留 0.5 m，不和別床共用（焜哥 2026-11-14：頭端至少 0.5 m，臨床慣例）
+function headStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,ends=h>w?[[...Array(w).keys()].map(i=>[x+i,y-1]),[...Array(w).keys()].map(i=>[x+i,y+h])]:[[...Array(h).keys()].map(i=>[x-1,y+i]),[...Array(h).keys()].map(i=>[x+w,y+i])];
+  return ends.find(st=>st.every(([u,v])=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u]&&!sim.aisle[v*W+u]))}
 // 幫患者找位子：照編號依序入座。重傷、中傷、留觀、隔離區床位從 1 號排起、坐著的從最後一床坐起；輕傷、候診相反
 function fit(a,f,seat){
   const lying=!seat&&a.lying,red=!seat&&a.cat==='r',str=a.str&&!seat,key=f+(lying?'L':'S')+(red?'R':'')+(str?'T':'');
@@ -1254,14 +1278,15 @@ function fit(a,f,seat){
     if(!rectFree(r,free))continue;
     const pl={r:{x:r.x,y:r.y,w:r.w,h:r.h},str,a,f,seat:!!seat,rect:true};
     if(red){pl.strip=bedStrip(r);if(!pl.strip)continue}
+    if(lying&&f==='major'){pl.head=headStrip(r);if(!pl.head)continue}
     if(stillOpen(pl))return pl}
   sim.noFit[key]=sim.ver; return null}
 function bump(){sim.ver++;sim.fields.clear()}
-function commit(pl){markFp(pl.r,1);if(pl.strip)pl.strip.forEach(([x,y])=>sim.aisle[y*map().W+x]++);computeWide();sim.placed.add(pl);bump();
+function commit(pl){markFp(pl.r,1);[pl.strip,pl.head].forEach(st=>st&&st.forEach(([x,y])=>sim.aisle[y*map().W+x]++));computeWide();sim.placed.add(pl);bump();
   sim.R[pl.f].n=(sim.R[pl.f].n||0)+1;
   if(fpLayer){const col=CAT[pl.a.exposure?'i':pl.a.cat].color;pl.nodes=[el('rect',{x:pl.r.x+.08,y:pl.r.y+.08,width:pl.r.w-.16,height:pl.r.h-.16,rx:.2,fill:col,'fill-opacity':.28,stroke:col,class:'fp'},fpLayer)];
-    if(pl.strip){const xs=pl.strip.map(c=>c[0]),ys=pl.strip.map(c=>c[1]),x=Math.min(...xs),y=Math.min(...ys);pl.nodes.push(el('rect',{x:x+.1,y:y+.1,width:Math.max(...xs)-x+.8,height:Math.max(...ys)-y+.8,class:'fp-aisle'},fpLayer))}}}
-function release(pl){markFp(pl.r,0);if(pl.strip)pl.strip.forEach(([x,y])=>sim.aisle[y*map().W+x]--);computeWide();sim.placed.delete(pl);bump();
+    [pl.strip,pl.head].forEach(st=>{if(!st)return;const xs=st.map(c=>c[0]),ys=st.map(c=>c[1]),x=Math.min(...xs),y=Math.min(...ys);pl.nodes.push(el('rect',{x:x+.1,y:y+.1,width:Math.max(...xs)-x+.8,height:Math.max(...ys)-y+.8,class:'fp-aisle'},fpLayer))})}}
+function release(pl){markFp(pl.r,0);[pl.strip,pl.head].forEach(st=>st&&st.forEach(([x,y])=>sim.aisle[y*map().W+x]--));computeWide();sim.placed.delete(pl);bump();
   sim.R[pl.f].n--; (pl.nodes||[]).forEach(n=>n.remove()); pl.a.inFp=false; pl.a.seated=false; serve()}
 // 空間釋出後依序補人：另一區的重症 → 本區排隊 → 另一區（輕症不跨區）
 function serve(){if(sim.serving){sim.again=true;return}sim.serving=true;
@@ -2001,7 +2026,10 @@ function start(data){
   let th='light';try{th=localStorage.getItem('mrs-theme')||'light'}catch(e){} setTheme(th);
   load(); if(data&&data.layouts&&data.v===2) state=Object.assign(state,data);
   ensureState(); if(state.mapId==='custom'&&!state.custom) state.mapId='classroom';
-  {const c=state.custom,p=presetHall();if(c&&c.name===p.name&&(c.pv||1)<p.pv)Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,scenario:p.scenario,facts:p.facts,pv:p.pv})}   // 範本更新時，舊的範本場地自動換新
+  // 11-14 起長方形大廳、長條場地改成獨立分頁：自訂場地裡如果是當初載入的範本，配置搬到新分頁（長方形大廳格子沒變，配置原樣保留），自訂場地清空
+  {const c=state.custom,id=c&&{'長方形大廳':'hall','長條場地':'strip'}[c.name];if(id&&!c.bg){
+    if(id==='hall')['','@b'].forEach(b=>['layouts','tapes','tents'].forEach(k=>{if(!(state[k][id+b]||[]).length)state[k][id+b]=state[k]['custom'+b]||[]}));
+    ['','@b'].forEach(b=>['layouts','tapes','tents'].forEach(k=>state[k]['custom'+b]=[]));state.custom=null;if(state.mapId==='custom')state.mapId=id}}
   BUILTIN.forEach(refreshGrid); rebuildCustom();
   allMaps().filter(m=>!(m.custom&&state.custom.editing)).flatMap(m=>[[m,m.id],[m,m.id+'@b']]).forEach(([m,k])=>state.layouts[k]=(state.layouts[k]||[]).filter(z=>z.x>=0&&z.y>=0&&z.x>=m.vx&&z.y>=m.vy&&z.x+z.w<=m.W&&z.y+z.h<=m.H&&!zoneCells(z).some(([x,y])=>'WTNO'.includes(m.g[y][x]))));   // 地圖改過後，超出範圍或壓到牆的區塊拿掉
   allMaps().forEach(m=>{joinZones(state.layouts[m.id]);joinZones(state.layouts[m.id+'@b'])});
