@@ -453,15 +453,16 @@ const ED_TOOLS=[
 let edTool='room', edUndo=[], edMeasure=null, edClearArmed=false, edPresetArmed=false;
 const isEditing=()=>state.mapId==='custom'&&!!state.custom&&!!state.custom.editing;
 // 範本場地：長方形大廳（焜哥 2026-11-14 提供：17.8 × 14.8 m，中間無柱；上方 2.5 m 大門，下方左右各 1 m 小門，都是平面；四面牆各 2 個插座；左下角廁所，廁所外有水槽）
+// 11-15 焜哥更正：只有上方大門，沒有下方兩個小門
 // 格子 0.5 m，室內畫成 36 × 30 格（18 × 15 m）；大門外留 3 m 空地（剛好停救護車）再接道路，兩側與後方只留 0.5 m（焜哥 11-14：外圍草地縮小 80%）
 function presetHall(){const W=40,H=41,g=Array.from({length:H},()=>Array(W).fill('G')),fill=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)g[y][x]=c};
   fill(0,0,W-1,1,'R');fill(1,8,38,39,'W');fill(2,9,37,38,'F');
-  fill(17,8,21,8,'D');fill(9,39,10,39,'D');fill(29,39,30,39,'D');
+  fill(17,8,21,8,'D');
   fill(2,35,5,38,'T');fill(6,35,6,38,'W');fill(2,34,5,34,'W');
   const feats={'2,33':'sink'};[[8,9],[31,9],[14,38],[25,38],[2,16],[2,27],[37,16],[37,27]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
   return {W,H,g:g.map(r=>r.join('')),feats,arrive:[34,1],rooms:[{name:'大廳',x:2,y:9,w:36,h:30},{name:'廁所',x:2,y:35,w:4,h:4}],
-    name:'長方形大廳',scenario:'在一間長方形大廳開設急救站。大門朝向道路，救護車從道路進來。',
-    facts:'室內實際約 17.8 × 14.8 m（地圖以 0.5 m 一格畫成 18 × 15 m）\n空間中間沒有柱子\n上方大門寬 2.5 m，下方左右各一個 1 m 小門，三個門擔架都推得過\n左下角有一間廁所，廁所外有水槽\n四面牆各有 2 個插座\n大門外到道路約 3 m 空地，其他三面緊鄰建築外牆',
+    name:'長方形大廳',pv:2,scenario:'在一間長方形大廳開設急救站。大門朝向道路，救護車從道路進來。',
+    facts:'室內實際約 17.8 × 14.8 m（地圖以 0.5 m 一格畫成 18 × 15 m）\n空間中間沒有柱子\n唯一出入口是上方大門，寬 2.5 m，平面，擔架推得過\n左下角有一間廁所，廁所外有水槽\n四面牆各有 2 個插座\n大門外到道路約 3 m 空地，其他三面緊鄰建築外牆',
     bg:null,bgShow:false,editing:false}}
 function newCustom(){state.custom=presetHall()}
 function newBlank(){const W=60,H=40;state.custom={W,H,g:Array.from({length:H},()=>'G'.repeat(W)),feats:{},arrive:null,rooms:[],name:'',scenario:'',facts:'',bg:null,bgShow:false,editing:true}}
@@ -1005,7 +1006,7 @@ $('#info').addEventListener('click',ev=>{
     if(id==='edMeasOK'){const v=+$('#edMeasM').value,bg=c.bg,mm=edMeasure;if(!(v>0)||!bg||!mm){toast('先填實際長度（公尺）');return}
       const L=Math.hypot(mm.x2-mm.x1,mm.y2-mm.y1),k=v/CELL_M/L;bg.x=mm.x1+(bg.x-mm.x1)*k;bg.y=mm.y1+(bg.y-mm.y1)*k;bg.w*=k;bg.h*=k;edMeasure=null;save();drawBase();drawZones();toast(`底圖已縮放成實際大小（${v} m）`);return}
     if(id==='edPreset'){if(!edPresetArmed){edPresetArmed=true;renderInfo();setTimeout(()=>{edPresetArmed=false;if(isEditing())renderInfo()},2500);return}
-      edPresetArmed=false;edSnap();const p=presetHall();Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,name:p.name,scenario:p.scenario,facts:p.facts});edRefresh();applyZoom();toast('已載入範本場地（可以復原），按「完成場地」開始佈置');return}
+      edPresetArmed=false;edSnap();const p=presetHall();Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,name:p.name,scenario:p.scenario,facts:p.facts,pv:p.pv});edRefresh();applyZoom();toast('已載入範本場地（可以復原），按「完成場地」開始佈置');return}
     if(id==='edClear'){if(!edClearArmed){edClearArmed=true;renderInfo();setTimeout(()=>{edClearArmed=false;if(isEditing())renderInfo()},2500);return}
       edClearArmed=false;edSnap();c.g=Array.from({length:c.H},()=>'G'.repeat(c.W));c.feats={};c.rooms=[];c.arrive=null;edRefresh();toast('已清空場地（可以復原）');return}
     return}
@@ -2000,10 +2001,11 @@ function start(data){
   let th='light';try{th=localStorage.getItem('mrs-theme')||'light'}catch(e){} setTheme(th);
   load(); if(data&&data.layouts&&data.v===2) state=Object.assign(state,data);
   ensureState(); if(state.mapId==='custom'&&!state.custom) state.mapId='classroom';
+  {const c=state.custom,p=presetHall();if(c&&c.name===p.name&&(c.pv||1)<p.pv)Object.assign(c,{W:p.W,H:p.H,g:p.g,feats:p.feats,rooms:p.rooms,arrive:p.arrive,scenario:p.scenario,facts:p.facts,pv:p.pv})}   // 範本更新時，舊的範本場地自動換新
   BUILTIN.forEach(refreshGrid); rebuildCustom();
   allMaps().filter(m=>!(m.custom&&state.custom.editing)).flatMap(m=>[[m,m.id],[m,m.id+'@b']]).forEach(([m,k])=>state.layouts[k]=(state.layouts[k]||[]).filter(z=>z.x>=0&&z.y>=0&&z.x>=m.vx&&z.y>=m.vy&&z.x+z.w<=m.W&&z.y+z.h<=m.H&&!zoneCells(z).some(([x,y])=>'WTNO'.includes(m.g[y][x]))));   // 地圖改過後，超出範圍或壓到牆的區塊拿掉
   allMaps().forEach(m=>{joinZones(state.layouts[m.id]);joinZones(state.layouts[m.id+'@b'])});
-  renderTabs(); renderBorp(); drawBase(); drawZones();
+  renderTabs(); renderBorp(); drawBase(); drawZones(); requestAnimationFrame(()=>applyZoom());   // 卡片匣畫好後高度才確定，再算一次符合視窗
   let seen=false;try{seen=!!localStorage.getItem('mrs-tut-v1')}catch(e){} if(!seen){tutI=0;tutShow()}
 }
 window.claude?.hot?.snapshot?.(()=>state);
