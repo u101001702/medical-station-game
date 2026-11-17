@@ -12,7 +12,7 @@
   --m-floor:#ffffff; --m-wall:#33475b; --m-toilet:#c9dcef; --m-xray:#c3c9e0; --m-tent:#e3d4a6; --m-obst:#a9bfa9; --m-door:#566676; --m-fl2:#f1f4f7;
   --m-hatch:rgba(60,90,60,.13); --m-obstx:rgba(40,70,45,.5); --m-dash:rgba(255,255,255,.9); --sink:#0b84a5; --tent-lbl:#6b5418;
   --dim-bg:#ffffff; --outlbl:rgba(60,80,100,.6); --arr:#d23434; --soft:#17222d; --scale-bg:rgba(255,255,255,.9); --sw-line:rgba(23,34,45,.3); --zone-op:.55;
-  --ln-pr:#e03131; --ln-py:#e0a800; --ln-pg:#2f9e44; --ln-pi:#c2255c; --ln-pb:#8a949e; --ln-sadmin:#7048e8; --ln-sdoc:#1c3d5a; --ln-snurse:#f06595; --ln-svol:#a87900; --ln-ssub:#e8590c; --ln-spharm:#0c8a6b; --ln-waste:#0b7285;
+  --ln-pr:#e03131; --ln-py:#e0a800; --ln-pg:#2f9e44; --ln-pi:#c2255c; --ln-pb:#8a949e; --ln-sadmin:#7048e8; --ln-sdoc:#1c3d5a; --ln-snurse:#f06595; --ln-svol:#a87900; --ln-ssub:#e8590c; --ln-spharm:#0c8a6b; --ln-srad:#364fc7; --ln-waste:#0b7285;
   color-scheme:light;
   --f-display:"LXGW WenKai TC","Noto Serif TC",serif;
   --f-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
@@ -26,7 +26,7 @@
   --m-floor:#123a60; --m-wall:#7fb4e3; --m-toilet:#2b5d8c; --m-xray:#3b4f78; --m-tent:#cbb98c; --m-obst:#244436; --m-door:#a9c4de; --m-fl2:#1d4f80;
   --m-hatch:rgba(127,180,227,.14); --m-obstx:rgba(160,210,170,.45); --m-dash:rgba(234,244,255,.35); --sink:#7fe0ff; --tent-lbl:#e6d7ad;
   --dim-bg:#0b1d30; --outlbl:rgba(169,196,222,.55); --arr:#ff8f85; --soft:#fff; --scale-bg:rgba(13,42,71,.8); --sw-line:rgba(234,244,255,.35); --zone-op:.42;
-  --ln-pr:#ff4d4d; --ln-py:#f2c230; --ln-pg:#3fbf6a; --ln-pi:#ff5fd2; --ln-pb:#c8d0da; --ln-sadmin:#a78bfa; --ln-sdoc:#ffffff; --ln-snurse:#ff9ecf; --ln-svol:#ffd166; --ln-ssub:#ff9f43; --ln-spharm:#5ce1b8; --ln-waste:#c0ff3e;
+  --ln-pr:#ff4d4d; --ln-py:#f2c230; --ln-pg:#3fbf6a; --ln-pi:#ff5fd2; --ln-pb:#c8d0da; --ln-sadmin:#a78bfa; --ln-sdoc:#ffffff; --ln-snurse:#ff9ecf; --ln-svol:#ffd166; --ln-ssub:#ff9f43; --ln-spharm:#5ce1b8; --ln-srad:#9fb4ff; --ln-waste:#c0ff3e;
   color-scheme:dark;
 }
 html,body{height:100%;background:var(--blue-deep);color:var(--chalk)}
@@ -1108,6 +1108,7 @@ const P = {
   jam:{shift:60,squeeze:120,temp:300,shiftAdd:60,slow:.5}, // 路被擋住（焜哥 2026-11-15）：1 分挪動擋路患者（被挪的多花 1 分）→ 2 分硬擠過患者旁（速度減半）→ 5 分就地設臨時醫療點
   per:{triage:2, pharm:2, morgue:1.25, borpTri:2, or:7, pacu:2},       // 這三區仍以坪數算位子；診療、留觀、隔離、候診改用患者佔地
   t:{triage:60, triageRed:60, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600},
+  pharmSlow:2,                                // 藥師處置輕症的時間是護理師的 2 倍（焜哥 2026-11-18）
   orCases:3, orGoal:1, noSinkAdd:600, orLoad:2,          // BORP：3 名需手術者依序開刀、一次一台，4 小時到就結束（焜哥 2026-11-18）；指標仍以完成 1 台為目標；手術室沒有洗手台 +10 分；手術室冷氣 900–1200 W 佔 2 份插座量
   crampedMul:1.8, yObsRate:.5, deteriorate:.1, gWorsen:.1,
   obsCheck:120, needDur:{toilet:180,food:300,water:60}, overdue:1800, // 留觀護理評估 2 分；生理需求拖超過 30 分就離崗
@@ -1131,7 +1132,7 @@ const PARAM_TEXT = [
   '面積連一個位子都不夠時，仍運作 1 個位子，但處置時間 ×1.8',
   '人員 6 角色 9 人：醫師 2、護理師 3、藥師 1、行政 1、志工 1、替代役 1',
   '重症插隊：沒有空閒人手時，中斷綠、黃患者的處置先救重症，先調綠再調黃；被中斷的患者暫停，等人回來再接著做',
-  '輕症需 1 醫師或 1 護理師（誰先空誰來）；紅、黃與隔離需 1 醫師＋1 護理師全程；檢傷、留觀評估 2 分各需 1 護理師；領藥需藥師',
+  '輕症需 1 醫師或 1 護理師（誰先空誰來）；人力極度緊繃（沒有空閒醫師、護理師）時藥師也可以處置輕症，但要先顧發藥、再顧後勤，都沒事才來，處置時間是護理師的 2 倍；紅、黃與隔離需 1 醫師＋1 護理師全程；檢傷、留觀評估 2 分各需 1 護理師；領藥需藥師',
   '檢傷護理師優先順序：①檢傷重症 ②重症區沒有空閒護理師時，先去協助重症初步處置，有人來交接或滿 5 分鐘就回檢傷 ③沒有重症需要她時，才檢傷其餘患者；她離崗時由其他空閒護理師代班檢傷。檢傷區沒人在等時，她也進診療區協助任何顏色的患者、不限時；這時有紅色來檢傷就立刻回，黃、綠色等她做完手上這位',
   '擔架每次移動需 2 人，由志工、替代役、行政負責；補貨、廢棄物清運與領物資另外放射師、藥師也可以做，忙不過來就要等',
   '躺床患者處置時，志工或替代役到藥局、庫備品區各領物資 30 秒後送到床邊；處置做到一半物資還沒到就暫停。走路的輕症自己到藥局領藥',
@@ -1480,11 +1481,15 @@ function dispatch(){
       const bt=isBorpTask(a),mine=own.filter(s=>s.borp===bt),other=own.filter(s=>s.borp!==bt);
       const order=a.useF==='triage'?[tri,mine,other]:bt?[mine,other]:[mine,other,tri]; // 檢傷先找檢傷護理師；床邊先找其他護理師
       const pool=order.find(l=>l.length),role=a.await[i];
-      const home=bt&&pool?pool.filter(x=>x.post===a.useF):[],s=pool?nearest(home.length?home:pool,a):(bt?recall(role,a):null)||(a.cat==='r'?preempt(role,a):null);if(!s)continue;
+      const home=bt&&pool?pool.filter(x=>x.post===a.useF):[],s=pool?nearest(home.length?home:pool,a):(bt?recall(role,a):null)||(a.cat==='r'?preempt(role,a):null)||(role==='dn'?pharmHelp(a):null);if(!s)continue;
+      if(s.role==='pharm'&&role==='dn'){a.timer*=P.pharmSlow;sim.stats.pharmHelp=(sim.stats.pharmHelp||0)+1}
       a.await.splice(i,1);a.crew.push(s);a.coming++;send(s,a,'bedside');s.task.role=role;if(s.post==='triage'&&a.useF!=='triage'){s.task.help=true;s.task.idle=!redHelp(a)||triEmpty();sim.stats.triHelp++;if(s.task.idle)sim.stats.triIdle=(sim.stats.triIdle||0)+1}}
   }
   while(sim.jobs.length){const free=idleOf(JOBBERS);if(!free.length)break;startJob(free[0],sim.jobs.shift())}
 }
+// 人力極度緊繃時藥師支援輕症（焜哥 2026-11-18）：沒有空閒醫師、護理師，而且沒人等領藥、沒有後勤工作（補貨、清運、領物資）時才來；處置時間是護理師的 2 倍
+function pharmHelp(a){if(sim.jobs.length||sim.agents.some(b=>!b.gone&&b.await&&b.await.includes('pharm')))return null;
+  const l=idleOf(['pharm']);return l.length?nearest(l,a):null}
 // BORP 有病人要處理時，把借去支援的 BORP 人員叫回來（一般區，或在 BORP 做本職以外的事）；原本的患者改等其他人
 function recall(role,a){const s=sim.staff.find(x=>x.borp&&x.can.includes(role)&&x.task&&x.task.k==='bedside'&&x.task.a!==a&&(x.task.role!==x.role||!isBorpTask(x.task.a)));if(!s)return null;const r0=s.task.role;
   const b=s.task.a;b.crew=b.crew.filter(x=>x!==s);if(s.goal)b.coming--;
@@ -1916,9 +1921,9 @@ function drawAgents(){
 // 動線分類（焜哥 2026-11-09）：患者依類別、人員依職類、垃圾處置分開記錄
 const LINE_GROUPS=[
   {h:'患者'},{k:'pr',n:'重症',c:'var(--ln-pr)'},{k:'py',n:'中症',c:'var(--ln-py)'},{k:'pg',n:'輕症',c:'var(--ln-pg)'},{k:'pi',n:'隔離患者',c:'var(--ln-pi)'},{k:'pb',n:'死亡患者',c:'var(--ln-pb)'},
-  {h:'人員'},{k:'sadmin',n:'行政人員',c:'var(--ln-sadmin)'},{k:'sdoc',n:'醫師',c:'var(--ln-sdoc)'},{k:'snurse',n:'護理師',c:'var(--ln-snurse)'},{k:'spharm',n:'藥師',c:'var(--ln-spharm)'},{k:'svol',n:'志工',c:'var(--ln-svol)'},{k:'ssub',n:'替代役',c:'var(--ln-ssub)'},
+  {h:'人員'},{k:'sadmin',n:'行政人員',c:'var(--ln-sadmin)'},{k:'sdoc',n:'醫師',c:'var(--ln-sdoc)'},{k:'snurse',n:'護理師',c:'var(--ln-snurse)'},{k:'spharm',n:'藥師',c:'var(--ln-spharm)'},{k:'srad',n:'放射師',c:'var(--ln-srad)'},{k:'svol',n:'志工',c:'var(--ln-svol)'},{k:'ssub',n:'替代役',c:'var(--ln-ssub)'},
   {h:'後勤'},{k:'waste',n:'垃圾處置',c:'var(--ln-waste)'}];
-const STAFF_LINE={rad:'sdoc',doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',pharm:'spharm',admin:'sadmin',vol:'svol',sub:'ssub'};
+const STAFF_LINE={rad:'srad',doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',pharm:'spharm',admin:'sadmin',vol:'svol',sub:'ssub'};
 function markGroups(a,k){const add=g=>{let r=sim.lineR.get(g);if(!r){r=new Map();sim.lineR.set(g,r)}r.set(k,(r.get(k)||0)+1)};
   if(a.staff){const g=STAFF_LINE[a.role];if(g)add(g);if(a.task&&a.task.k==='waste'&&a.task.got)add('waste');return}
   add('p'+(a.exposure?'i':a.cat));
@@ -2177,7 +2182,7 @@ function renderSimInfo(){
       <dt>最長等候</dt><dd>${Math.round(maxWait/60)} 分</dd><dt>患者總步行</dt><dd>${Math.round(s.patientWalk)} m</dd>
       ${s.shifted||s.squeezed||s.tempSite?`<dt>路被擋住</dt><dd style="color:var(--bad)">挪動患者 ${s.shifted} 次・硬擠過 ${s.squeezed} 次・臨時醫療點 ${s.tempSite} 處</dd>`:''}</dl>
     <div class="sub">人員</div><ul class="caps">${Object.keys(ROLES).filter(k=>sim.staff.some(x=>x.role===k)).map(k=>{const l=sim.staff.filter(x=>x.role===k),b=l.filter(x=>x.state==='busy'&&x.task&&x.task.k!=='need').length,o=l.filter(x=>x.task&&x.task.k==='need').length;return `<li><span>${ROLES[k].name}</span><b>${l.length} 人</b><span class="q${b+o>=l.length?' on':''}">忙 ${b}${o?`・離崗 ${o}`:''}</span></li>`}).join('')}</ul>
-    <dl class="kv"><dt>人員總步行</dt><dd>${Math.round(s.staffWalk)} m</dd><dt>擔架搬運</dt><dd>${s.carries} 趟</dd>${sim.xr?`<dt>X 光</dt><dd>${s.xrDone} 人${sim.radOn?'（放射師）':`（醫師操作 ${Math.round(s.xrDoc/60)} 分）`}${s.xrDone?`・平均等機器 ${Math.round(s.xrWait/s.xrDone/60)} 分`:''}</dd>`:''}${s.preempted?`<dt>重症插隊</dt><dd>${s.preempted} 次</dd>`:''}${sim.borp?`<dt>手術</dt><dd>完成 ${s.surgDone}・開刀中 ${s.surgStart-s.surgDone} / 需要 ${sim.agents.filter(a=>a.surg).length} 人</dd>${s.borpRecall?`<dt>BORP 叫回</dt><dd>${s.borpRecall} 次</dd>`:''}`:''}<dt>物資斷貨</dt><dd>${s.stockouts} 次${s.supplyDelay?`（延誤 ${Math.round(s.supplyDelay/60)} 分）`:''}</dd><dt>廢棄物清運</dt><dd>${s.wasteDone} 袋</dd></dl>
+    <dl class="kv"><dt>人員總步行</dt><dd>${Math.round(s.staffWalk)} m</dd><dt>擔架搬運</dt><dd>${s.carries} 趟</dd>${s.pharmHelp?`<dt>藥師支援輕症</dt><dd>${s.pharmHelp} 人</dd>`:''}${sim.xr?`<dt>X 光</dt><dd>${s.xrDone} 人${sim.radOn?'（放射師）':`（醫師操作 ${Math.round(s.xrDoc/60)} 分）`}${s.xrDone?`・平均等機器 ${Math.round(s.xrWait/s.xrDone/60)} 分`:''}</dd>`:''}${s.preempted?`<dt>重症插隊</dt><dd>${s.preempted} 次</dd>`:''}${sim.borp?`<dt>手術</dt><dd>完成 ${s.surgDone}・開刀中 ${s.surgStart-s.surgDone} / 需要 ${sim.agents.filter(a=>a.surg).length} 人</dd>${s.borpRecall?`<dt>BORP 叫回</dt><dd>${s.borpRecall} 次</dd>`:''}`:''}<dt>物資斷貨</dt><dd>${s.stockouts} 次${s.supplyDelay?`（延誤 ${Math.round(s.supplyDelay/60)} 分）`:''}</dd><dt>廢棄物清運</dt><dd>${s.wasteDone} 袋</dd></dl>
     <div class="sub">位子與排隊</div><ul class="caps">${cap||'<li>沒有可提供服務的區塊</li>'}</ul>
     ${cramped.length?`<p class="desc">面積不足、處置變慢：${cramped.join('、')}</p>`:''}
     ${missing.length?`<p class="desc">這次沒有擺：${missing.join('、')}</p>`:''}
