@@ -1123,7 +1123,7 @@ const PARAM_TEXT = [
   '輕症 10% 於處置後轉重症：改躺、用擔架移到重傷區（等床時留在原位），再照重症處置與轉出',
   '留觀：中症 30 分、重症 20 分後轉出；中症一半需要留觀，留觀中 10% 惡化轉出',
   '佔地：坐 1 × 1 m，躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺；疑似傳染躺',
-  '所有躺床：床頭外留 0.5 m 站醫師做頭部處置（頭對頭兩床可共用）。重傷區的床兩個長邊外各留 0.5 m（可與隔壁床共用）；其他區兩床一組並排、組間 0.5 m，每床至少一側站得了人。候診座位不分組，有空位就整排排滿',
+  '所有躺床：床頭外留 0.5 m 站醫師做頭部處置（頭對頭兩床可共用）。重傷區的床兩個長邊外各留 0.5 m（可與隔壁床共用）；其他區床與床之間都隔 0.5 m，每床至少一側站得了人（靠區塊邊緣的那床可以只有一側）。候診座位不分組，有空位就整排排滿',
   '有 X 光機的場地（衛生所）：約 5 成患者診療中途要離床照 X 光，一次 2 分鐘，照完回原床做完處置；擔架患者來回都要 2 人抬。可加派放射師；沒有就由醫師操作，醫師順序是紅色患者＞紅色 X 光＞黃色患者＞黃色 X 光＞綠色患者＞綠色 X 光（疑似傳染比照黃色，照完機器消毒 5 分鐘）',
   '路被擋住時：卡 1 分鐘先把擋路的患者挪到同區別的位子（被挪的人處置多 1 分鐘）；挪不動，卡 2 分鐘就從患者旁邊慢慢擠過去；被區塊或封鎖線整個堵死，卡 5 分鐘就地設臨時醫療點，要出站或轉送的靠人力抬出。不會自動搬動功能區',
   '重症長邊外側要留 0.5 m 走道，兩床可共用；患者是障礙物不能跨越，擺放時一定留出通道（擔架 1 m、步行 0.5 m）',
@@ -1264,9 +1264,9 @@ function gridBands(S,d,gap,lead,head){const t=[];let p=lead?gap:0,pair=0;
 function gridRects(z,bed,horiz,gap,lead,end,head){
   const L=horiz?z.w:z.h,S=horiz?z.h:z.w,d=bed?2*CM:CM,bands=gridBands(S,d,gap,lead,head).slice(0,!bed&&Math.min(z.w,z.h)<6?1:99),out=[];if(!bands.length)return out;
   const off=end?S-bands[bands.length-1]-d:0,along=[];
-  // 重傷區的床兩側都留 0.5 m（區塊邊緣也留）；其他區兩床一組並排、組間 0.5 m，每床至少一側站得了人；座位不分組，整排排滿（焜哥 2026-11-18）
+  // 重傷區的床兩側都留 0.5 m（區塊邊緣也留）；其他區床與床之間都隔 0.5 m、靠區塊邊緣的那床可以只有一側（焜哥 2026-11-18）；座位不分組，整排排滿
   const both=bed&&z.funcs.includes('major'),tail=both?1:0;
-  for(let i=0;;i++){const p=both?1+i*(CM+1):bed?i*CM+(i>>1):i*CM;if(p+CM+tail>L)break;along.push(p)}
+  for(let i=0;;i++){const p=both?1+i*(CM+1):bed?i*(CM+1):i*CM;if(p+CM+tail>L)break;along.push(p)}
   const offL=end&&along.length?L-along[along.length-1]-CM-tail:0;
   bands.forEach((t,band)=>along.forEach(u=>{const a=u+offL,b=t+off;out.push(horiz?{x:z.x+a,y:z.y+b,w:CM,h:d,band}:{x:z.x+b,y:z.y+a,w:d,h:CM,band})}));
   return out}
