@@ -204,6 +204,7 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
     <div class="brand"><b>急救站佈局挑戰</b><small>FIRST-AID STATION LAYOUT</small></div>
     <div class="tabs" role="tablist" id="tabs"></div>
     <button class="tbtn" id="borpBtn" type="button" aria-pressed="false" title="備援手術小組（BORP）進駐，開設手術室">第三類急救站（BORP）</button>
+    <button class="tbtn" id="radBtn" type="button" aria-pressed="false" title="有 X 光機的場地可加派一名放射師；沒有放射師時由醫師操作" hidden>配置放射師</button>
     <span class="stage">第一層・站級配置</span>
     <div class="tools">
       <button class="tbtn" id="themeBtn" type="button" title="切換白底／深藍藍圖配色">藍圖</button>
@@ -680,7 +681,7 @@ function drawDim(m){const d=m.dim,g=el('g',{class:'dim'},svg),line=(x1,y1,x2,y2)
   const [g0,g1]=d.gap||[b,b];line(d.side,d.y,d.side,g0);if(d.gap)line(d.side,g1,d.side,b);line(d.side-t,d.y,d.side+t,d.y);line(d.side-t,b,d.side+t,b);
   const label=(x,y,t,rot)=>{const w=t.length*.72+.5,o=rot?{transform:`rotate(-90 ${x} ${y})`}:{};el('rect',{x:x-w/2,y:y-.75,width:w,height:1.5,rx:.25,...o},g);el('text',{x,y:y+.4,...o},g).textContent=t};
   label(d.x+d.w/2,d.top,meters(d.w)+' m');label(d.side,d.sideT??d.y+d.h/2,meters(d.h)+' m',true)}
-function drawBase(){
+function drawBase(){renderRad();
   const m=map(); svg.innerHTML='';
   const pd=m.pad||0;svg.setAttribute('viewBox',`${m.vx-pd} ${m.vy-pd} ${(m.vw??m.W-m.vx)+2*pd} ${(m.vh??m.H-m.vy)+2*pd}`);
   const defs=el('defs',{},svg);
@@ -1081,6 +1082,7 @@ const P = {
   walk:1/CELL_M,                              // 步行 1 m/s
   stretcherMul:.5, stairWalkMul:.5, stairStretcherMul:.2,
   cellCap:2, squeezeAfter:3,                  // 每格最多 2 人（擔架算 2）；卡住 3 秒後硬擠過去
+  xray:{rate:.5,t:120,at:.6,isoClean:300}, // 有 X 光機的場地（焜哥 2026-11-17）：診療中約 5 成要照 X 光，一次 2 分；照到診療 4 成時離床去照；疑似傳染照完消毒 5 分（遊戲假設）
   jam:{shift:60,squeeze:120,temp:300,shiftAdd:60,slow:.5}, // 路被擋住（焜哥 2026-11-15）：1 分挪動擋路患者（被挪的多花 1 分）→ 2 分硬擠過患者旁（速度減半）→ 5 分就地設臨時醫療點
   per:{triage:2, pharm:2, morgue:1.25, borpTri:2, or:7, pacu:2},       // 這三區仍以坪數算位子；診療、留觀、隔離、候診改用患者佔地
   t:{triage:60, triageRed:30, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600},
@@ -1100,6 +1102,7 @@ const PARAM_TEXT = [
   '留觀：中症 30 分、重症 20 分後轉出；中症一半需要留觀，留觀中 10% 惡化轉出',
   '佔地：坐 1 × 1 m，躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺；疑似傳染躺',
   '重傷區躺床的頭端（短邊）外要留 0.5 m，不和別床共用（焜哥臨床慣例），所以重傷區每排床之間隔 1 m',
+  '有 X 光機的場地（衛生所）：約 5 成患者診療中途要離床照 X 光，一次 2 分鐘，照完回原床做完處置；擔架患者來回都要 2 人抬。可加派放射師；沒有就由醫師操作，醫師順序是紅色患者＞紅色 X 光＞黃色患者＞黃色 X 光＞綠色患者＞綠色 X 光（疑似傳染比照黃色，照完機器消毒 5 分鐘）',
   '路被擋住時：卡 1 分鐘先把擋路的患者挪到同區別的位子（被挪的人處置多 1 分鐘）；挪不動，卡 2 分鐘就從患者旁邊慢慢擠過去；被區塊或封鎖線整個堵死，卡 5 分鐘就地設臨時醫療點，要出站或轉送的靠人力抬出。不會自動搬動功能區',
   '重症長邊外側要留 0.5 m 走道，兩床可共用；患者是障礙物不能跨越，擺放時一定留出通道（擔架 1 m、步行 0.5 m）',
   '檢傷 2 坪、藥局窗口 2 坪、遺體 1.25 坪各一位',
@@ -1353,7 +1356,7 @@ const has=f=>sim.R[f]&&(isSpace(f)||f==='public'?sim.R[f].zones.length>0:sim.R[f
 
 // ---- 人員（Sprint 3）----
 const ROLES={doc:{name:'醫師',ch:'醫',color:'#ffffff'},nurse:{name:'護理師',ch:'護',color:'#ffd9ec'},pharm:{name:'藥師',ch:'藥',color:'#c9f7d2'},admin:{name:'行政',ch:'行',color:'#ddd4ff'},vol:{name:'志工',ch:'志',color:'#ffe9b8'},sub:{name:'替代役',ch:'替',color:'#ffd2a8'},
-  surg:{name:'外科醫師',ch:'外',color:'#ffc4cc'},ortho:{name:'骨科醫師',ch:'骨',color:'#ffc4cc'},anes:{name:'麻醉醫師',ch:'麻',color:'#ffc4cc'},aide:{name:'衛勤',ch:'衛',color:'#ffd2a8'}};
+  surg:{name:'外科醫師',ch:'外',color:'#ffc4cc'},ortho:{name:'骨科醫師',ch:'骨',color:'#ffc4cc'},anes:{name:'麻醉醫師',ch:'麻',color:'#ffc4cc'},aide:{name:'衛勤',ch:'衛',color:'#ffd2a8'},rad:{name:'放射師',ch:'放',color:'#d6e4ff'}};
 const ROSTER=[['doc','major'],['doc','minor'],['nurse','triage'],['nurse','major'],['nurse','minor'],['pharm','pharm'],['admin','admin'],['vol','public'],['sub','store']];
 // BORP 9 人（附件二十四）：檢傷分類組 急診醫師、急診護理師、衛勤；手術組 外科、骨科、麻醉；術後恢復組 加護護理師、護理師；行政組 衛勤
 const BORP_ROSTER=[['doc','borpTri'],['nurse','borpTri'],['aide','borpTri'],['surg','or'],['ortho','or'],['anes','or'],['nurse','pacu'],['nurse','pacu'],['aide','or']];
@@ -1363,8 +1366,9 @@ const BORP_F=['borpTri','or','pacu'], isBorpTask=a=>BORP_F.includes(a.useF)||(a.
 const PORTERS=['vol','sub'], FETCH_F=['major','mid','minor','iso'];
 function makeStaff(){
   const m=map(),[sx,sy]=sim.staffStart,r=mulberry32(99);
-  sim.staff=ROSTER.concat(sim.borp?BORP_ROSTER:[]).map(([role,post],i)=>{const n=[{k:'water',t:1200+r()*4800},{k:'toilet',t:2400+r()*9600},{k:'food',t:4800+r()*6000},{k:'water',t:7200+r()*5600}].sort((p,q)=>p.t-q.t);
-    const c=[sx+(i%3),sy+(((i%9)/3)|0)],o={id:i,staff:true,role,post,can:CAN[role]||[role],borp:i>=ROSTER.length,needs:n,state:'idle',task:null,x:c[0],y:c[1],cx:c[0],cy:c[1],goal:null,goalKind:null,timer:0,blocked:0,follow:null};
+  const base=ROSTER.concat(sim.radOn?[['rad','xray']]:[]);
+  sim.staff=base.concat(sim.borp?BORP_ROSTER:[]).map(([role,post],i)=>{const n=[{k:'water',t:1200+r()*4800},{k:'toilet',t:2400+r()*9600},{k:'food',t:4800+r()*6000},{k:'water',t:7200+r()*5600}].sort((p,q)=>p.t-q.t);
+    const c=[sx+(i%3),sy+(((i%9)/3)|0)],o={id:i,staff:true,role,post,can:CAN[role]||[role],borp:i>=base.length,needs:n,state:'idle',task:null,x:c[0],y:c[1],cx:c[0],cy:c[1],goal:null,goalKind:null,timer:0,blocked:0,follow:null};
     sim.occ[o.cy*m.W+o.cx]+=1; return o});
   sim.staff.forEach(goPost);
 }
@@ -1393,7 +1397,8 @@ function computePower(){
 }
 const zoneOfRect=r=>zones().find(z=>r.x>=z.x&&r.x<z.x+z.w&&r.y>=z.y&&r.y<z.y+z.h);
 function firstZone(f){return zones().find(z=>z.funcs.includes(f))}
-function goPost(s){const z=firstZone(s.post)||(isTreat(s.post)&&TREAT_F.map(firstZone).find(Boolean)); s.task={k:'post'};
+function goPost(s){if(s.post==='xray'){s.task={k:'post'};setGoal(s,sim.xrCells,'staff');return}
+  const z=firstZone(s.post)||(isTreat(s.post)&&TREAT_F.map(firstZone).find(Boolean)); s.task={k:'post'};
   if(z) setGoal(s,around(z).filter(([x,y])=>sim.walk[y*map().W+x]&&!sim.fp[y*map().W+x]),'staff'); else {s.goal=null}}
 function freeStaff(s){s.follow=null;if(s.quit){s.state='out';s.task={k:'out'};s.goal=null;s.timer=0;return}s.state='idle';goPost(s)}
 const overdue=s=>s.needs.length&&sim.t>s.needs[0].t+P.overdue;
@@ -1424,7 +1429,9 @@ function triHelpCheck(){for(const s of sim.staff){const t=s.task;if(s.post!=='tr
 function dispatch(){
   triHelpCheck();
   for(const s of sim.staff){ if(s.state==='idle'&&s.needs.length&&sim.t>=s.needs[0].t) goNeed(s) }
-  const ask=sim.agents.filter(a=>!a.gone&&((a.await&&a.await.length)||(a.carry&&!a.carry.crew.length))).sort((p,q)=>PRIO[p.cat]-PRIO[q.cat]||p.id-q.id);
+  // 照 X 光排在同顏色患者的處置之後：紅患者 > 紅 X 光 > 黃患者 > 黃 X 光 > 綠患者 > 綠 X 光（焜哥 2026-11-17；疑似傳染比照黃色）
+  const pk=a=>a.svc==='xray'?PRIO[a.cat==='i'?'y':a.cat]*2+1:PRIO[a.cat]*2;
+  const ask=sim.agents.filter(a=>!a.gone&&((a.await&&a.await.length)||(a.carry&&!a.carry.crew.length))).sort((p,q)=>pk(p)-pk(q)||p.id-q.id);
   for(const a of ask){
     if(a.carry&&!a.carry.crew.length){const bt=!!(a.surg&&a.slot&&BORP_F.includes(a.slot.f)),free=idleOf(PORTERS).sort((p,q)=>(p.borp===bt?0:1)-(q.borp===bt?0:1));
       if(free.length>=2){free.slice(0,2).forEach(s=>{a.carry.crew.push(s);a.carry.coming++;send(s,a,'carry')});sim.stats.carries++}}
@@ -1596,7 +1603,10 @@ function arrived(a){
   if(k==='slot'){const f=a.slot.f; a.svc=f; a.moving=false; if(a.slot.s.rect) settle(a,a.slot.s);
     if(f==='morgue'){a.stage='body';return}
     a.timer=svcTime(a,f,a.slot.s); a.crew=[]; a.coming=0; a.await=crewFor(a,f); a.ss=sim.t; a.useF=f; a.stocked=false;
-    a.crewUntil=f==='obs'&&!a.postop?Math.max(0,a.timer-P.obsCheck):null; if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0}; return}
+    a.crewUntil=f==='obs'&&!a.postop?Math.max(0,a.timer-P.obsCheck):null; if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0};
+    if(sim.xr&&!a.xrHad&&(isTreat(f)||f==='iso')){a.xrHad=true;if(sim.xrRnd()<P.xray.rate)a.xrAt=a.timer*P.xray.at} return}
+  if(k==='xray'){a.svc='xray';a.xrQ=sim.t;return}
+  if(k==='xrback'){backToBed(a);return}
   if(k==='exit'){leave(a,'discharged');return}
   if(k==='transfer'){leave(a,'transferred');return}
   if(k==='wait'&&a.spot&&a.spot.kind==='seat') settle(a,a.spot.s);
@@ -1608,6 +1618,7 @@ function leave(a,why){a.gone=true; dropCarry(a); releaseCrew(a); if(a.slot){cons
 // 服務完成後下一步
 function done(a){
   const f=a.svc; a.svc=null;
+  if(f==='xray'){sim.xrUser=null;sim.xrFree=sim.t+(a.cat==='i'||a.exposure?P.xray.isoClean:0);sim.stats.xrDone++;a.svc='xray';setGoal(a,bedCells(a),'xrback');return}
   if(f==='triage'){a.triaged=true; sim.stats.triaged++; rel(a); route(a); return}
   if(isTreat(f)){if(a.worsen){worsen(a);return}
     sim.stats.treated++; addBag(f);
@@ -1696,6 +1707,19 @@ function moveAgent(a,dt){
   sim.stats[a.staff?'staffWalk':'patientWalk']+=Math.min(step,dist)*CELL_M;
 }
 
+// ---- 照 X 光（焜哥 2026-11-17）：診療做到一半離床去 X 光室，照完回原床把剩下的處置做完；床位保留 ----
+const bedCells=a=>{const s=a.slot.s;return s.rect?around(s.r):[[s.x,s.y]]};
+function goXray(a){const W=map().W,ok=i=>sim.walk[i]&&!sim.fp[i]&&(!a.str||sim.wide[i]);a.xrAt=null;
+  const out=a.slot&&a.slot.s.rect?around(a.slot.s.r).filter(([x,y])=>ok(y*W+x)):[];
+  const fd=getField(sim.xrCells,a.str,true,0),c=out.filter(([x,y])=>fd[y*W+x]<Infinity).sort((p,q)=>fd[p[1]*W+p[0]]-fd[q[1]*W+q[0]])[0];
+  if(!c){sim.stats.xrSkip++;return}   // 從床邊走不到 X 光室：這次不照
+  releaseCrew(a);a.xrRemain=a.timer;a.timer=0;a.svc='xray';a.xrF=a.useF;
+  const w=a.str?2:1;sim.occ[a.cy*W+a.cx]-=w;a.cx=c[0];a.cy=c[1];a.x=c[0];a.y=c[1];sim.occ[a.cy*W+a.cx]+=w;a.inFp=false;
+  setGoal(a,sim.xrCells,'xray')}
+function backToBed(a){const f=a.xrF,s=a.slot&&a.slot.s;a.xrF=null;
+  if(s&&s.rect)settle(a,s);
+  a.svc=f;a.useF=f;a.timer=a.xrRemain;a.xrRemain=null;a.crew=[];a.coming=0;a.await=crewFor(a,f);a.ss=sim.t}
+
 // ---- 路被擋住（焜哥 2026-11-15）----
 // ① 卡住 1 分：把擋路的床位、座位挪到同功能區另一個不擋路的位置（被挪的患者處置多 1 分）
 // ② 卡住 2 分：還過不去就從患者旁邊硬擠過去，速度減半（牆、固定設備、封鎖線、管制區照樣不能穿）
@@ -1727,6 +1751,8 @@ function shiftPl(pl){const a=pl.a,W=map().W,aisle=v=>[pl.strip,pl.head].forEach(
 function tempSite(a){const k=a.goalKind;a.goal=null;a.goalKind=null;a.noWay=0;a.moving=false;dropCarry(a);
   if(!a.stuck){a.stuck=true;sim.stats.stuck++}
   // 要出站、要轉送的人走不到出口或救護車區：工作人員徒手抬出去，另外記錄
+  if(k==='xray'){a.xrQ=null;sim.stats.xrSkip++;setGoal(a,bedCells(a),'xrback');return}   // 走不到 X 光室：不照了，回床
+  if(k==='xrback'){backToBed(a);return}                                            // 回不了床：就地把處置做完
   if(k==='exit'||k==='transfer'){sim.stats.noWayOut++;leave(a,k==='exit'?'discharged':'transferred');return}
   if(k!=='slot'||!a.slot){freeSpot(a);return}   // 走去等候位置的：原地等叫號
   const f=a.slot.f,s=a.slot;a.slot=null;freeSlot(s);sim.stats.tempSite++;
@@ -1742,11 +1768,14 @@ function tick(dt){
   const W=map().W;
   for(const a of sim.agents){ if(a.gone) continue;
     if(a.goal){if(a.str&&!a.carried){askCarry(a);continue} moveAgent(a,dt);continue}
+    if(a.svc==='xray'&&a.xrQ!=null){if(sim.xrUser||sim.t<sim.xrFree)continue;   // X 光機一次一人；消毒中也要等
+      sim.xrUser=a;a.waitTotal+=sim.t-a.xrQ;sim.stats.xrWait+=sim.t-a.xrQ;a.xrQ=null;a.timer=P.xray.t;a.crew=[];a.coming=0;a.await=[sim.radOn?'rad':'doc'];a.ss=sim.t}
     if(a.await){if(a.await.length||a.coming)continue;a.await=null;a.waitTotal+=sim.t-a.ss;a.ss=null;
       if(!a.stocked){a.stocked=true;if(!takeStock(a,a.useF)){a.noStock=sim.t;sim.stats.stockouts++}askFetch(a)}}
     if(a.noStock!=null){const late=sim.t-a.noStock>=P.improvise;if(!late&&!takeStock(a,a.useF))continue;sim.stats.supplyDelay+=Math.min(sim.t-a.noStock,P.improvise);a.noStock=null}
-    if(a.fetchAt!=null&&a.timer<=a.fetchAt){sim.stats.supplyDelay+=dt;continue}
-    if(a.timer>0){a.timer-=dt*rate;
+    if(a.fetchAt!=null&&a.svc!=='xray'&&a.timer<=a.fetchAt){sim.stats.supplyDelay+=dt;continue}
+    if(a.xrAt!=null&&a.timer>0&&a.timer<=a.xrAt){goXray(a);continue}
+    if(a.timer>0){a.timer-=dt*rate;if(a.svc==='xray'&&!sim.radOn)sim.stats.xrDoc+=dt*rate;
       if(a.crewUntil!=null&&a.timer<=a.crewUntil){releaseCrew(a);a.crewUntil=null}
       if(a.timer<=0){a.timer=0;releaseCrew(a);done(a)}}
   }
@@ -1840,7 +1869,7 @@ const LINE_GROUPS=[
   {h:'患者'},{k:'pr',n:'重症',c:'var(--ln-pr)'},{k:'py',n:'中症',c:'var(--ln-py)'},{k:'pg',n:'輕症',c:'var(--ln-pg)'},{k:'pi',n:'隔離患者',c:'var(--ln-pi)'},{k:'pb',n:'死亡患者',c:'var(--ln-pb)'},
   {h:'人員'},{k:'sadmin',n:'行政人員',c:'var(--ln-sadmin)'},{k:'sdoc',n:'醫師',c:'var(--ln-sdoc)'},{k:'snurse',n:'護理師',c:'var(--ln-snurse)'},{k:'svol',n:'志工',c:'var(--ln-svol)'},{k:'ssub',n:'替代役',c:'var(--ln-ssub)'},
   {h:'後勤'},{k:'waste',n:'垃圾處置',c:'var(--ln-waste)'}];
-const STAFF_LINE={doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',admin:'sadmin',vol:'svol',sub:'ssub'};
+const STAFF_LINE={rad:'sdoc',doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',admin:'sadmin',vol:'svol',sub:'ssub'};
 function markGroups(a,k){const add=g=>{let r=sim.lineR.get(g);if(!r){r=new Map();sim.lineR.set(g,r)}r.set(k,(r.get(k)||0)+1)};
   if(a.staff){const g=STAFF_LINE[a.role];if(g)add(g);if(a.task&&a.task.k==='waste'&&a.task.got)add('waste');return}
   add('p'+(a.exposure?'i':a.cat));
@@ -1868,13 +1897,16 @@ function startSim(){
   if(isEditing()) return;
   mode='sim'; selected=null; infoFunc=null; itemMode=null; tapeMode=false; selTape=null; tentMode=false; selTent=null; document.body.classList.add('simming');
   const m=map();
-  sim={t:0,speed:2,borp:!!state.borp,orUsed:0,alerts:new Map(),seen:{},nextScan:0,running:true,ended:false,nextId:1,agents:[],sched:makeSchedule(),fields:new Map(),rnd:mulberry32(7),
+  sim={t:0,speed:2,borp:!!state.borp,xrRnd:mulberry32(31),xrUser:null,xrFree:0,orUsed:0,alerts:new Map(),seen:{},nextScan:0,running:true,ended:false,nextId:1,agents:[],sched:makeSchedule(),fields:new Map(),rnd:mulberry32(7),
     occ:new Int16Array(m.W*m.H),stand:new Int32Array(m.W*m.H),routes:new Map(),staffRoutes:new Map(),lineR:new Map(),lines:new Set(),block:new Float32Array(m.W*m.H),
-    stats:{arrived:0,triaged:0,treated:0,supported:0,discharged:0,transferred:0,deteriorated:0,stuck:0,shifted:0,squeezed:0,tempSite:0,noWayOut:0,noTreat:0,patientWalk:0,staffWalk:0,preempted:0,triHelp:0,triHandoff:0,triLeave:0,borpRecall:0,surgStart:0,surgDone:0,surgOut:0,orAt:null,cross:0,crossIso:0,crossBody:0,crossWaste:0,carries:0,stockouts:0,supplyDelay:0,wasteDone:0,wasteLeft:0,waits:[]},showPat:false,showStaff:false};
+    stats:{arrived:0,triaged:0,treated:0,supported:0,discharged:0,transferred:0,deteriorated:0,xrDone:0,xrSkip:0,xrDoc:0,xrWait:0,stuck:0,shifted:0,squeezed:0,tempSite:0,noWayOut:0,noTreat:0,patientWalk:0,staffWalk:0,preempted:0,triHelp:0,triHandoff:0,triLeave:0,borpRecall:0,surgStart:0,surgDone:0,surgOut:0,orAt:null,cross:0,crossIso:0,crossBody:0,crossWaste:0,carries:0,stockouts:0,supplyDelay:0,wasteDone:0,wasteLeft:0,waits:[]},showPat:false,showStaff:false};
   sim.R=buildResources();
   const N=m.W*m.H,W=m.W; Object.assign(sim,{tape:new Uint8Array(N),fp:new Uint8Array(N),aisle:new Uint8Array(N),wide:new Uint8Array(N),walk:new Uint8Array(N),slotCell:new Uint8Array(N),planCell:new Uint8Array(N),rw:new Uint8Array(N),rs:new Uint8Array(N),d0:new Int32Array(N),bq:new Int32Array(N),placed:new Set(),keep:new Uint8Array(N),wideL:null,noFit:{},ver:0,serving:false,again:false});
   for(let i=0;i<N;i++) sim.walk[i]=WALKABLE.has(m.g[(i/W)|0][i%W])?1:0;
   zones().forEach(z=>(z.items||[]).forEach(it=>itemCells(it).forEach(([x,y])=>{sim.walk[y*W+x]=0;sim.fp[y*W+x]=1})));
+  // X 光機旁邊站得到的格子；有才啟用照 X 光
+  sim.xrCells=[];for(let y=1;y<m.H-1;y++)for(let x=1;x<m.W-1;x++)if(m.g[y][x]==='F'&&sim.walk[y*W+x]&&[[1,0],[-1,0],[0,1],[0,-1]].some(([u,v])=>m.g[y+v][x+u]==='X'))sim.xrCells.push([x,y]);
+  sim.xr=sim.xrCells.length>0;sim.radOn=sim.xr&&!!state.rad;
   for(const k in sim.R) sim.R[k].slots.forEach(s=>sim.slotCell[s.y*W+s.x]=1);
   computeWide();
   // 距入口的步數：床位、座位由近到遠編號
@@ -1965,6 +1997,8 @@ function evaluate(){
   const tri=firstZone('triage'),maj=firstZone('major'),amb=firstZone('amb'),sto=firstZone('store'),obs=firstZone('obs'),pub=firstZone('public');
   if(s.tempSite)note(`${s.tempSite} 名患者走不到該去的區塊，就地設臨時醫療點`,'區塊或封鎖線把唯一的路堵死，患者不能穿越','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
   if(s.noWayOut)note(`${s.noWayOut} 名患者走不到出口或救護車區，靠人力抬出`,'出口、救護車區的路被區塊堵死','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
+  if(sim.xr&&s.xrDone)note(sim.radOn?`放射師照了 ${s.xrDone} 人 X 光`:`沒有放射師，醫師照 X 光共 ${Math.round(s.xrDoc/60)} 分（${s.xrDone} 人）`,sim.radOn?'醫師可以專心處置患者':'照 X 光時醫師離開診療區，其他患者要等','遊戲假設：約 5 成患者需要 X 光，一次 2 分');
+  if(s.xrSkip)note(`${s.xrSkip} 名患者走不到 X 光室，沒照到 X 光`,'X 光室的路被區塊或封鎖線堵住','遊戲假設');
   if(s.shifted||s.squeezed)note(`路被患者擋住：挪動患者 ${s.shifted} 次、硬擠過去 ${s.squeezed} 次`,'床位、座位擺太滿，走道被佔走','擔架要 1 m 寬的走道（遊戲假設）');
   if(!tri) note('沒有設檢傷掛號區','患者進站後沒有分流，重症沒有優先處置','指引 p.12：檢傷區靠近入口、單一入口');
   else{const d=Math.min(...sim.exits.map(([x,y])=>Math.abs(x-tri.x)+Math.abs(y-tri.y)))*CELL_M;if(d>15)note(`檢傷區離出入口約 ${Math.round(d)} m`,'患者要先穿過站內才能分流','指引 p.12：檢傷區靠近入口')}
@@ -2031,7 +2065,7 @@ function renderSimInfo(){
       <dt>最長等候</dt><dd>${Math.round(maxWait/60)} 分</dd><dt>患者總步行</dt><dd>${Math.round(s.patientWalk)} m</dd>
       ${s.shifted||s.squeezed||s.tempSite?`<dt>路被擋住</dt><dd style="color:var(--bad)">挪動患者 ${s.shifted} 次・硬擠過 ${s.squeezed} 次・臨時醫療點 ${s.tempSite} 處</dd>`:''}</dl>
     <div class="sub">人員</div><ul class="caps">${Object.keys(ROLES).filter(k=>sim.staff.some(x=>x.role===k)).map(k=>{const l=sim.staff.filter(x=>x.role===k),b=l.filter(x=>x.state==='busy'&&x.task&&x.task.k!=='need').length,o=l.filter(x=>x.task&&x.task.k==='need').length;return `<li><span>${ROLES[k].name}</span><b>${l.length} 人</b><span class="q${b+o>=l.length?' on':''}">忙 ${b}${o?`・離崗 ${o}`:''}</span></li>`}).join('')}</ul>
-    <dl class="kv"><dt>人員總步行</dt><dd>${Math.round(s.staffWalk)} m</dd><dt>擔架搬運</dt><dd>${s.carries} 趟</dd>${s.preempted?`<dt>重症插隊</dt><dd>${s.preempted} 次</dd>`:''}${sim.borp?`<dt>手術</dt><dd>完成 ${s.surgDone}・開刀中 ${s.surgStart-s.surgDone} / 需要 ${sim.agents.filter(a=>a.surg).length} 人</dd>${s.borpRecall?`<dt>BORP 叫回</dt><dd>${s.borpRecall} 次</dd>`:''}`:''}<dt>物資斷貨</dt><dd>${s.stockouts} 次${s.supplyDelay?`（延誤 ${Math.round(s.supplyDelay/60)} 分）`:''}</dd><dt>廢棄物清運</dt><dd>${s.wasteDone} 袋</dd></dl>
+    <dl class="kv"><dt>人員總步行</dt><dd>${Math.round(s.staffWalk)} m</dd><dt>擔架搬運</dt><dd>${s.carries} 趟</dd>${sim.xr?`<dt>X 光</dt><dd>${s.xrDone} 人${sim.radOn?'（放射師）':`（醫師操作 ${Math.round(s.xrDoc/60)} 分）`}${s.xrDone?`・平均等機器 ${Math.round(s.xrWait/s.xrDone/60)} 分`:''}</dd>`:''}${s.preempted?`<dt>重症插隊</dt><dd>${s.preempted} 次</dd>`:''}${sim.borp?`<dt>手術</dt><dd>完成 ${s.surgDone}・開刀中 ${s.surgStart-s.surgDone} / 需要 ${sim.agents.filter(a=>a.surg).length} 人</dd>${s.borpRecall?`<dt>BORP 叫回</dt><dd>${s.borpRecall} 次</dd>`:''}`:''}<dt>物資斷貨</dt><dd>${s.stockouts} 次${s.supplyDelay?`（延誤 ${Math.round(s.supplyDelay/60)} 分）`:''}</dd><dt>廢棄物清運</dt><dd>${s.wasteDone} 袋</dd></dl>
     <div class="sub">位子與排隊</div><ul class="caps">${cap||'<li>沒有可提供服務的區塊</li>'}</ul>
     ${cramped.length?`<p class="desc">面積不足、處置變慢：${cramped.join('、')}</p>`:''}
     ${missing.length?`<p class="desc">這次沒有擺：${missing.join('、')}</p>`:''}
@@ -2074,6 +2108,9 @@ $('#tutBtn').onclick=()=>{tutI=0;tutShow()};$('#tutSkip').onclick=tutClose;$('#t
 // 頂列
 function renderTabs(){$('#tabs').innerHTML=[...BUILTIN,{id:'custom',tab:'自訂場地'}].map(m=>`<button class="tab" role="tab" type="button" aria-selected="${m.id===state.mapId}" data-m="${m.id}">${m.tab}</button>`).join('')}
 $('#tabs').addEventListener('click',ev=>{const b=ev.target.closest('.tab');if(!b)return;if(mode==='sim')stopSim();state.mapId=b.dataset.m;if(state.mapId==='custom'&&!state.custom){newCustom();rebuildCustom()}selected=null;infoFunc=null;selTent=null;selTape=null;tentMode=false;tapeMode=false;edMeasure=null;edUndo=[];renderTabs();drawBase();drawZones();applyZoom()});
+const hasXray=m=>m.g.some(r=>r.includes('X'));
+function renderRad(){const b=$('#radBtn');if(!b)return;b.hidden=!hasXray(map());b.classList.toggle('on',!!state.rad);b.setAttribute('aria-pressed',String(!!state.rad))}
+$('#radBtn')&&($('#radBtn').onclick=()=>{if(mode==='sim')stopSim();state.rad=!state.rad;renderRad();save();toast(state.rad?'加派放射師：X 光由放射師照':'沒有放射師：X 光由醫師操作')});
 function renderBorp(){const b=$('#borpBtn');b.classList.toggle('on',!!state.borp);b.setAttribute('aria-pressed',String(!!state.borp))}
 $('#borpBtn').onclick=()=>{if(mode==='sim')stopSim();if(isEditing()){toast('先完成場地再切換');return}
   state.borp=!state.borp;
