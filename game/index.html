@@ -166,7 +166,10 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .fp{stroke-width:.14;pointer-events:none}
 .ghost-size{fill:var(--soft);font-size:1.5px;font-weight:700;text-anchor:middle;pointer-events:none}
 .plan{fill:none;stroke:var(--soft);stroke-opacity:.28;stroke-width:.07;pointer-events:none}
+.plan.ortable{fill:#fff;fill-opacity:.55;stroke:var(--wall,#33475b);stroke-opacity:.9;stroke-width:.14}
+.orlbl{fill:var(--chalk);font-size:.9px;font-weight:700;text-anchor:middle;font-family:var(--f-body);paint-order:stroke;stroke:rgba(255,255,255,.7);stroke-width:.18px;pointer-events:none}
 .plan-no{fill:var(--soft);fill-opacity:.55;font-size:.85px;text-anchor:middle;font-family:var(--f-mono);pointer-events:none}
+.fp-temp{fill:none;stroke:var(--bad);stroke-width:.14;stroke-dasharray:.35 .25;pointer-events:none}
 .fp-aisle{fill:none;stroke:var(--soft);stroke-opacity:.5;stroke-width:.1;stroke-dasharray:.4 .3;pointer-events:none}
 .caps{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .caps li{display:grid;grid-template-columns:4em 1fr auto;gap:6px;font-size:13px}
@@ -1078,6 +1081,7 @@ const P = {
   walk:1/CELL_M,                              // 步行 1 m/s
   stretcherMul:.5, stairWalkMul:.5, stairStretcherMul:.2,
   cellCap:2, squeezeAfter:3,                  // 每格最多 2 人（擔架算 2）；卡住 3 秒後硬擠過去
+  jam:{shift:60,squeeze:120,temp:300,shiftAdd:60,slow:.5}, // 路被擋住（焜哥 2026-11-15）：1 分挪動擋路患者（被挪的多花 1 分）→ 2 分硬擠過患者旁（速度減半）→ 5 分就地設臨時醫療點
   per:{triage:2, pharm:2, morgue:1.25, borpTri:2, or:7, pacu:2},       // 這三區仍以坪數算位子；診療、留觀、隔離、候診改用患者佔地
   t:{triage:60, triageRed:30, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600},
   orCases:1, noSinkAdd:600, orLoad:2,          // BORP：只開 1 台刀（焜哥 2026-11-09）；手術室沒有洗手台 +10 分；手術室冷氣 900–1200 W 佔 2 份插座量
@@ -1096,6 +1100,7 @@ const PARAM_TEXT = [
   '留觀：中症 30 分、重症 20 分後轉出；中症一半需要留觀，留觀中 10% 惡化轉出',
   '佔地：坐 1 × 1 m，躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺；疑似傳染躺',
   '重傷區躺床的頭端（短邊）外要留 0.5 m，不和別床共用（焜哥臨床慣例），所以重傷區每排床之間隔 1 m',
+  '路被擋住時：卡 1 分鐘先把擋路的患者挪到同區別的位子（被挪的人處置多 1 分鐘）；挪不動，卡 2 分鐘就從患者旁邊慢慢擠過去；被區塊或封鎖線整個堵死，卡 5 分鐘就地設臨時醫療點，要出站或轉送的靠人力抬出。不會自動搬動功能區',
   '重症長邊外側要留 0.5 m 走道，兩床可共用；患者是障礙物不能跨越，擺放時一定留出通道（擔架 1 m、步行 0.5 m）',
   '檢傷 2 坪、藥局窗口 2 坪、遺體 1.25 坪各一位',
   '面積連一個位子都不夠時，仍運作 1 個位子，但處置時間 ×1.8',
@@ -1165,15 +1170,18 @@ function buildNoGo(){const W=map().W;sim.pzone=new Int16Array(W*map().H);sim.pki
   // 管制區裡的定點（遺體區、手術室）：擔架至少要到得了區塊門口
   sim.gates=zones().filter(z=>(z.funcs.includes('morgue')||z.funcs.includes('or'))&&sim.pkind[z.y*W+z.x]===2).map(z=>around(z).map(([x,y])=>y*W+x).filter(i=>sim.walk[i]))}
 function goalZone(targets){const W=map().W,n={};let best=0;targets.forEach(([x,y])=>{const z=sim.pzone[y*W+x];if(z>0&&(n[z]=(n[z]||0)+1)>(n[best]||0))best=z});return best}
-function cellCost(i,str,ex,fz){const m=map(),c=m.g[(i/m.W)|0][i%m.W];
-  if(!WALKABLE.has(c)||sim.fp[i]||(str&&!sim.wide[i]))return Infinity;
+// lo：硬擠模式，可以從患者床位、座位旁擠過去（牆、固定設備、封鎖線、管制區照樣不能穿）
+function wideL(){if(sim.wideL)return sim.wideL;const m=map(),W=m.W,H=m.H,w=sim.wideL=new Uint8Array(W*H),ok=i=>sim.walk[i]&&!sim.tape[i];
+  for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){const i=y*W+x;if(ok(i)&&ok(i+1)&&ok(i+W)&&ok(i+W+1)){w[i]=1;w[i+1]=1;w[i+W]=1;w[i+W+1]=1}}return w}
+function cellCost(i,str,ex,fz,lo){const m=map(),c=m.g[(i/m.W)|0][i%m.W];
+  if(!WALKABLE.has(c)||(lo?!sim.walk[i]||(str&&!wideL()[i]):sim.fp[i]||(str&&!sim.wide[i])))return Infinity;
   const k=ex===undefined||sim.pzone[i]===ex||(fz&&sim.pzone[i]===fz)?0:sim.pkind[i];if(k===2)return Infinity;
   return (isStair(c)?(str?6:2):1)*(k?AVOID:1)}
 // fz：患者目前所在的管制區（例如剛開完刀在手術室裡），要走得出來
-function getField(targets,str,pat,fz){
-  const key=(pat?'p':'')+(fz?'f'+fz:'')+(str?'s':'w')+'|'+targets.map(t=>t[0]+','+t[1]).join(';');
+function getField(targets,str,pat,fz,lo){
+  const key=(lo?'L':'')+(pat?'p':'')+(fz?'f'+fz:'')+(str?'s':'w')+'|'+targets.map(t=>t[0]+','+t[1]).join(';');
   if(sim.fields.has(key)) return sim.fields.get(key);
-  const m=map(),W=m.W,H=m.H,d=new Float64Array(W*H).fill(Infinity),heap=[],ex=pat?goalZone(targets):undefined,cost=i=>cellCost(i,str,ex,fz);
+  const m=map(),W=m.W,H=m.H,d=new Float64Array(W*H).fill(Infinity),heap=[],ex=pat?goalZone(targets):undefined,cost=i=>cellCost(i,str,ex,fz,lo);
   const push=(v,i)=>{heap.push([v,i]);let k=heap.length-1;while(k>0){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p}};
   const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){const l=2*k+1,r=l+1;let s=k;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===k)break;[heap[s],heap[k]]=[heap[k],heap[s]];k=s}}return top};
   targets.forEach(([x,y])=>{const i=y*W+x;if(cost(i)<Infinity){d[i]=0;push(0,i)}});
@@ -1192,9 +1200,10 @@ function computeWide(){const m=map(),W=m.W,H=m.H,w=sim.wide; w.fill(0);
   const ok=i=>sim.walk[i]&&!sim.fp[i]&&!sim.tape[i];
   for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){const i=y*W+x;if(ok(i)&&ok(i+1)&&ok(i+W)&&ok(i+W+1)){w[i]=1;w[i+1]=1;w[i+W]=1;w[i+W+1]=1}}}
 // 從道路入口往內走，看哪些格子到得了
-function reach(str,out){const m=map(),W=m.W,H=m.H,q=sim.bq,[sx,sy]=m.arrive;out.fill(0);let h=0,t=0;const s=sy*W+sx;
+// 起點：步行入口＋救護車區（擔架患者從救護車區進站）
+function reach(str,out){const m=map(),W=m.W,H=m.H,q=sim.bq;out.fill(0);let h=0,t=0;
   const can=i=>sim.walk[i]&&!sim.fp[i]&&(!str||(sim.wide[i]&&sim.pkind[i]!==2));
-  if(!can(s))return;out[s]=1;q[t++]=s;
+  (sim.entries||[m.arrive]).forEach(([sx,sy])=>{const s=sy*W+sx;if(can(s)&&!out[s]){out[s]=1;q[t++]=s}});
   while(h<t){const i=q[h++],x=i%W,y=(i/W)|0;
     if(x>0&&!out[i-1]&&can(i-1)){out[i-1]=1;q[t++]=i-1} if(x<W-1&&!out[i+1]&&can(i+1)){out[i+1]=1;q[t++]=i+1}
     if(y>0&&!out[i-W]&&can(i-W)){out[i-W]=1;q[t++]=i-W} if(y<H-1&&!out[i+W]&&can(i+W)){out[i+W]=1;q[t++]=i+W}}}
@@ -1204,17 +1213,20 @@ function around(r){const c=[],W=map().W,H=map().H;
   return c}
 function markFp(r,v){const W=map().W;for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)sim.fp[y*W+x]=v}
 // 暫時放下這塊，檢查所有人與所有出入口都還走得到
+// 只擋「擺下去之後才變得到不了」的：本來就到不了的（例如區塊把路堵死）不算，否則一張床都擺不下去、全站停擺（焜哥 2026-11-15）
 function stillOpen(pl){
-  const W=map().W,w=sim.rw,s=sim.rs;markFp(pl.r,1);computeWide();reach(false,w);reach(true,s);
-  const near=(r,arr)=>around(r).some(([x,y])=>arr[y*W+x]);
-  let ok=near(pl.r,pl.str?s:w);
-  if(ok&&pl.strip) ok=pl.strip.every(([x,y])=>w[y*W+x]);
-  if(ok&&pl.head) ok=pl.head.some(([x,y])=>w[y*W+x]);
-  if(ok) ok=sim.exits.every(([x,y])=>w[y*W+x]);
-  if(ok) ok=sim.anchors.every(i=>s[i])&&sim.gates.every(l=>l.some(i=>s[i]));
-  if(ok) for(const o of sim.placed){if(!near(o.r,o.str&&!o.a.seated?s:w)){ok=false;break}}
-  if(ok) for(const a of sim.agents){if(a.gone||a.inFp||a.moving)continue;const i=a.cy*W+a.cx;if(sim.pkind[i]!==2&&!(a.str?s:w)[i]){ok=false;break}}
-  if(ok) for(const t of sim.staff){if(!t.follow&&!w[t.cy*W+t.cx]){ok=false;break}}
+  const m=map(),W=m.W,N=W*m.H;if(!sim.rw0){sim.rw0=new Uint8Array(N);sim.rs0=new Uint8Array(N)}
+  const w0=sim.rw0,s0=sim.rs0;computeWide();reach(false,w0);reach(true,s0);
+  const w=sim.rw,s=sim.rs;markFp(pl.r,1);computeWide();reach(false,w);reach(true,s);
+  const near=(r,arr)=>around(r).some(([x,y])=>arr[y*W+x]),cut=(r,a1,a0)=>!near(r,a1)&&near(r,a0),lost=(i,a1,a0)=>!a1[i]&&a0[i];
+  let ok=!cut(pl.r,pl.str?s:w,pl.str?s0:w0);
+  if(ok&&pl.strip) ok=pl.strip.every(([x,y])=>w[y*W+x]||!w0[y*W+x]);
+  if(ok&&pl.head) ok=pl.head.some(([x,y])=>w[y*W+x]||!w0[y*W+x]);
+  if(ok) ok=!sim.exits.some(([x,y])=>lost(y*W+x,w,w0));
+  if(ok) ok=!sim.anchors.some(i=>lost(i,s,s0))&&sim.gates.every(l=>l.some(i=>s[i])||!l.some(i=>s0[i]));
+  if(ok) for(const o of sim.placed){const st=o.str&&!o.a.seated;if(cut(o.r,st?s:w,st?s0:w0)){ok=false;break}}
+  if(ok) for(const a of sim.agents){if(a.gone||a.inFp||a.moving||a.squeeze)continue;const i=a.cy*W+a.cx;if(sim.pkind[i]!==2&&lost(i,a.str?s:w,a.str?s0:w0)){ok=false;break}}
+  if(ok) for(const t of sim.staff){if(!t.follow&&lost(t.cy*W+t.cx,w,w0)){ok=false;break}}
   markFp(pl.r,0);computeWide();return ok}
 // 開場依區塊排好床位、座位：床 1×2 m 成排、床間 0.5 m，兩排床夾一條走道；座位 4 張一組
 const BED_F=['major','mid','obs','iso'], GRID_F=[...SPACE_F,'public'];
@@ -1259,7 +1271,9 @@ function buildPlan(){const W=map().W,zs=zones().filter(z=>z.funcs.some(f=>GRID_F
       markFp(sp,1);placed.push(sp);z.funcs.forEach(f=>{if(GRID_F.includes(f))sim.R[f].plan.push(sp)})})}
   placed.forEach(r=>{markFp(r,0);for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)sim.planCell[y*W+x]=1});
   computeWide();sim.plan=placed}
-function drawPlan(){sim.plan.forEach(r=>{el('rect',{x:r.x+.06,y:r.y+.06,width:r.w-.12,height:r.h-.12,rx:.2,class:'plan'},fpLayer);
+function drawPlan(){(sim.borpBeds||[]).forEach(r=>{el('rect',{x:r.x+.06,y:r.y+.06,width:r.w-.12,height:r.h-.12,rx:.2,class:r.f==='or'?'plan ortable':'plan'},fpLayer);
+  if(r.f==='or'){const t=el('text',{x:r.x+r.w/2,y:r.y+r.h+1,class:'orlbl'},fpLayer);t.textContent='手術台'}});
+  sim.plan.forEach(r=>{el('rect',{x:r.x+.06,y:r.y+.06,width:r.w-.12,height:r.h-.12,rx:.2,class:'plan'},fpLayer);
   const t=el('text',{x:r.x+r.w/2,y:r.y+r.h/2+.3,class:'plan-no'},fpLayer);t.textContent=r.no})}
 // 重症床長邊外側的 0.5 m 走道，已有走道的那側優先（兩床共用）
 function bedStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,sides=w>h?[[...Array(w).keys()].map(i=>[x+i,y-1]),[...Array(w).keys()].map(i=>[x+i,y+h])]:[[...Array(h).keys()].map(i=>[x-1,y+i]),[...Array(h).keys()].map(i=>[x+w,y+i])];
@@ -1272,7 +1286,7 @@ function headStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,ends=h>w?[[...Array(w).key
 function fit(a,f,seat){
   const lying=!seat&&a.lying,red=!seat&&a.cat==='r',str=a.str&&!seat,key=f+(lying?'L':'S')+(red?'R':'')+(str?'T':'');
   if(sim.noFit[key]===sim.ver) return null;
-  const m=map(),W=m.W,free=(x,y)=>{const i=y*W+x;return m.g[y][x]==='F'&&!sim.fp[i]&&!sim.aisle[i]&&!sim.occ[i]&&!sim.stand[i]&&!sim.slotCell[i]};
+  const m=map(),W=m.W,free=(x,y)=>{const i=y*W+x;return m.g[y][x]==='F'&&!sim.fp[i]&&!sim.aisle[i]&&!sim.occ[i]&&!sim.stand[i]&&!sim.slotCell[i]&&!sim.keep[i]};
   const plan=sim.R[f].plan,inOrder=BED_F.includes(f)===!!lying;
   for(const sp of inOrder?plan:[...plan].reverse())for(const r of lying?(sp.bed?[sp]:[]):sp.seats){
     if(!rectFree(r,free))continue;
@@ -1318,6 +1332,23 @@ function buildResources(){
   });
   return R;
 }
+// BORP 三區＋遺體區的床位（焜哥 2026-11-15）：手術台擺在手術室正中央；BORP 檢傷分類區、術後恢復區照 2 坪 1 床排成一排排的床（1×2 m）
+// 只畫床、患者躺在床中間那格；床不當障礙物（跟其他區開場排的床位一樣），所以不影響通道檢查
+function placeBorpBeds(){const m=map(),W=m.W,ok=(x,y)=>'FGR'.includes(m.g[y][x])&&!sim.fp[y*W+x];sim.borpBeds=[];  // 室外的遺體區擺在空地（G）上
+  ['or','borpTri','pacu','morgue'].forEach(f=>sim.R[f].zones.forEach(z=>{const sl=sim.R[f].slots.filter(s=>s.zone===z.id);if(!sl.length)return;
+    let rects;
+    if(f==='or'){const horiz=z.w>=z.h,bw=horiz?2*CM:CM,bh=horiz?CM:2*CM,cx=z.x+(z.w-bw)/2,cy=z.y+(z.h-bh)/2,c=[];
+      for(let y=z.y;y+bh<=z.y+z.h;y++)for(let x=z.x;x+bw<=z.x+z.w;x++)c.push({x,y,w:bw,h:bh,d:Math.hypot(x-cx,y-cy)});
+      c.sort((p,q)=>p.d-q.d);rects=[];for(const r of c){if(rects.length>=sl.length)break;
+        if(rectFree(r,ok)&&rects.every(o=>r.x>=o.x+o.w+CM||o.x>=r.x+r.w+CM||r.y>=o.y+o.h+CM||o.y>=r.y+r.h+CM))rects.push(r)}}
+    else if(f==='morgue'){let best=[];for(const horiz of [true,false]){const g=[],bw=horiz?CM:2*CM,bh=horiz?2*CM:CM;   // 遺體床位緊貼併排，不留走道（焜哥 2026-11-15）
+        for(let y=z.y;y+bh<=z.y+z.h;y+=bh)for(let x=z.x;x+bw<=z.x+z.w;x+=bw){const r={x,y,w:bw,h:bh};if(rectFree(r,ok))g.push(r)}if(g.length>best.length)best=g}
+      rects=best.sort((p,q)=>stepsIn(p)-stepsIn(q)).slice(0,sl.length)}
+    else{let best=[];for(const horiz of [true,false])for(const gap of [2,1])for(const lead of [false,true])for(const end of [false,true]){
+        const g=gridRects(z,true,horiz,gap,lead,end,false).filter(r=>rectFree(r,ok));if(g.length>best.length)best=g}
+      rects=best.sort((p,q)=>stepsIn(p)-stepsIn(q)).slice(0,sl.length)}
+    rects.forEach((r,i)=>{const s=sl[i];sim.slotCell[s.y*W+s.x]=0;s.x=r.x+(r.w>>1);s.y=r.y+(r.h>>1);sim.slotCell[s.y*W+s.x]=1;
+      for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)sim.planCell[y*W+x]=1;sim.borpBeds.push({...r,f})})}))}
 const has=f=>sim.R[f]&&(isSpace(f)||f==='public'?sim.R[f].zones.length>0:sim.R[f].slots.length>0);
 
 // ---- 人員（Sprint 3）----
@@ -1555,12 +1586,13 @@ function nearFree(zs,str){
   return null;
 }
 const hardZoneOf=a=>{if(a.staff)return 0;const i=a.cy*map().W+a.cx;return sim.pkind[i]===2&&sim.pzone[i]>0?sim.pzone[i]:0};
-function setGoal(a,targets,kind){a.goal=targets;a.goalKind=kind;a.fz=hardZoneOf(a);a.field=getField(targets,a.str,!a.staff,a.fz);a.fv=sim.ver;a.blocked=0}
+function setGoal(a,targets,kind){a.goal=targets;a.goalKind=kind;a.fz=hardZoneOf(a);a.field=getField(targets,a.str,!a.staff,a.fz);a.fv=sim.ver;a.blocked=0;
+  a.squeeze=false;a.shiftTried=false;a.lfv=-1;if(a.tempNode){a.tempNode.remove();a.tempNode=null}}
 
 // 抵達目標
 function arrived(a){
   if(a.staff){staffArrived(a);return}
-  const k=a.goalKind; a.goal=null; a.goalKind=null; dropCarry(a);
+  const k=a.goalKind; a.goal=null; a.goalKind=null; a.squeeze=false; dropCarry(a);
   if(k==='slot'){const f=a.slot.f; a.svc=f; a.moving=false; if(a.slot.s.rect) settle(a,a.slot.s);
     if(f==='morgue'){a.stage='body';return}
     a.timer=svcTime(a,f,a.slot.s); a.crew=[]; a.coming=0; a.await=crewFor(a,f); a.ss=sim.t; a.useF=f; a.stocked=false;
@@ -1571,7 +1603,7 @@ function arrived(a){
   // 'wait'：到等候位置，靜待叫號
 }
 function leave(a,why){a.gone=true; dropCarry(a); releaseCrew(a); if(a.slot){const s=a.slot;a.slot=null;freeSlot(s)} freeSpot(a);
-  sim.occ[a.cy*map().W+a.cx]-=a.str?2:1; sim.stats[why]++; sim.stats.waits.push(a.waitTotal); if(a.node){a.node.remove();a.node=null}}
+  sim.occ[a.cy*map().W+a.cx]-=a.str?2:1; sim.stats[why]++; sim.stats.waits.push(a.waitTotal); if(a.node){a.node.remove();a.node=null} if(a.tempNode){a.tempNode.remove();a.tempNode=null}}
 
 // 服務完成後下一步
 function done(a){
@@ -1636,13 +1668,13 @@ function noteCross(a){const i=a.cy*map().W+a.cx,b=sim.zbit[i];if(!b)return;
 // ---- 移動 ----
 function moveAgent(a,dt){
   const m=map(),W=m.W; if(a.fv!==sim.ver){a.field=getField(a.goal,a.str,!a.staff,a.fz);a.fv=sim.ver}
-  const ci=a.cy*W+a.cx;let d=a.field;
+  const ci=a.cy*W+a.cx;let d=a.squeeze?looseField(a):a.field;
   if(a.moving&&d[ci]===Infinity)d=getField(a.goal,false,true,a.fz);   // 轉重症的擔架先從座位間擠出來
   const atCenter=Math.abs(a.x-a.cx)<.02&&Math.abs(a.y-a.cy)<.02;
   if(atCenter){
     if(d[ci]===0){arrived(a);return}
-    if(d[ci]===Infinity){a.noWay=a.noWay||sim.t;if(!a.stuck&&!a.staff&&sim.t-a.noWay>300){a.stuck=true;sim.stats.stuck++}
-      if(a.staff&&sim.t-a.noWay>60)staffGiveUp(a);return}
+    if(d[ci]===Infinity){a.noWay=a.noWay||sim.t;
+      if(a.staff){if(sim.t-a.noWay>60)staffGiveUp(a)}else unjam(a);return}
     a.noWay=0;
     let best=null,bv=d[ci];
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=a.cx+dx,ny=a.cy+dy;if(nx<0||ny<0||nx>=W||ny>=m.H)continue;
@@ -1657,11 +1689,51 @@ function moveAgent(a,dt){
   }
   const c=m.g[a.cy][a.cx]; let sp=P.walk*(a.str?P.stretcherMul:1); if(isStair(c)) sp*=a.str?P.stairStretcherMul:P.stairWalkMul;
   if(sim.cord[a.cy*W+a.cx]) sp*=a.str?P.cordStr:P.cordWalk;
+  if(a.squeeze&&(sim.fp[a.cy*W+a.cx]||(a.str&&!sim.wide[a.cy*W+a.cx]))) sp*=P.jam.slow;
   noteCross(a);
   const dx=a.cx-a.x,dy=a.cy-a.y,dist=Math.hypot(dx,dy),step=sp*dt;
   if(dist<=step){a.x=a.cx;a.y=a.cy} else {a.x+=dx/dist*step;a.y+=dy/dist*step}
   sim.stats[a.staff?'staffWalk':'patientWalk']+=Math.min(step,dist)*CELL_M;
 }
+
+// ---- 路被擋住（焜哥 2026-11-15）----
+// ① 卡住 1 分：把擋路的床位、座位挪到同功能區另一個不擋路的位置（被挪的患者處置多 1 分）
+// ② 卡住 2 分：還過不去就從患者旁邊硬擠過去，速度減半（牆、固定設備、封鎖線、管制區照樣不能穿）
+// ③ 卡住 5 分：路是被區塊本身堵死的，就地設臨時醫療點；不自動搬功能區，留給學員自己發現、修正
+function looseField(a){if(a.lfv!==sim.ver){a.lfield=getField(a.goal,a.str,!a.staff,a.fz,true);a.lfv=sim.ver}return a.lfield}
+function unjam(a){const J=P.jam,t=sim.t-a.noWay;if(t<J.shift)return;
+  const L=looseField(a);
+  if(L[a.cy*map().W+a.cx]<Infinity){if(!a.shiftTried){a.shiftTried=true;if(shiftBlockers(a,L))return}
+    if(t>=J.squeeze){a.squeeze=true;a.noWay=0;sim.stats.squeezed++}return}
+  if(t>=J.temp)tempSite(a)}
+function shiftBlockers(a,L){const m=map(),W=m.W,H=m.H,keep=sim.keep,r=a.str?1:0;let i=a.cy*W+a.cx;
+  for(let n=0;n<W*H&&L[i]>0;n++){const x=i%W,y=(i/W)|0;let b=-1,bv=L[i];
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const u=x+dx,v=y+dy;if((dx||dy)&&u>=0&&v>=0&&u<W&&v<H&&L[v*W+u]<bv){bv=L[v*W+u];b=v*W+u}}
+    if(b<0)break;i=b;
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const u=(i%W)+dx,v=((i/W)|0)+dy;if(u>=0&&v>=0&&u<W&&v<H)keep[v*W+u]=1}}
+  const hit=[...sim.placed].filter(pl=>pl.a!==a&&zoneCells(pl.r).some(([x,y])=>keep[y*W+x]));
+  let moved=0;for(const pl of hit)if(shiftPl(pl))moved++;
+  keep.fill(0);if(moved)serve();return moved>0}
+function shiftPl(pl){const a=pl.a,W=map().W,aisle=v=>[pl.strip,pl.head].forEach(st=>st&&st.forEach(([x,y])=>sim.aisle[y*W+x]+=v));
+  markFp(pl.r,0);aisle(-1);sim.placed.delete(pl);computeWide();bump();
+  const p2=fit(a,pl.f,pl.seat||undefined);
+  if(!p2){markFp(pl.r,1);aisle(1);sim.placed.add(pl);computeWide();bump();return false}
+  sim.R[pl.f].n--;(pl.nodes||[]).forEach(n=>n.remove());commit(p2);p2.occ=pl.occ;
+  if(a.slot&&a.slot.s===pl)a.slot.s=p2;if(a.spot&&a.spot.s===pl)a.spot.s=p2;
+  if(a.goal)setGoal(a,around(p2.r),a.goalKind);
+  else if(a.inFp){settle(a,p2);if(a.timer>0)a.timer+=P.jam.shiftAdd;
+    sim.staff.forEach(s=>{if(s.task&&s.task.a===a&&s.goal)setGoal(s,spotOf(a).filter(([x,y])=>sim.walk[y*W+x]&&!sim.fp[y*W+x]),'staff')})}
+  sim.stats.shifted++;return true}
+function tempSite(a){const k=a.goalKind;a.goal=null;a.goalKind=null;a.noWay=0;a.moving=false;dropCarry(a);
+  if(!a.stuck){a.stuck=true;sim.stats.stuck++}
+  // 要出站、要轉送的人走不到出口或救護車區：工作人員徒手抬出去，另外記錄
+  if(k==='exit'||k==='transfer'){sim.stats.noWayOut++;leave(a,k==='exit'?'discharged':'transferred');return}
+  if(k!=='slot'||!a.slot){freeSpot(a);return}   // 走去等候位置的：原地等叫號
+  const f=a.slot.f,s=a.slot;a.slot=null;freeSlot(s);sim.stats.tempSite++;
+  if(fpLayer)a.tempNode=el('rect',{x:a.cx-.5,y:a.cy-.5,width:2,height:2,rx:.3,class:'fp-temp'},fpLayer);
+  a.svc=f;if(f==='morgue'){a.stage='body';return}
+  a.timer=svcTime(a,f,null);a.crew=[];a.coming=0;a.await=crewFor(a,f);a.ss=sim.t;a.useF=f;a.stocked=false;
+  a.crewUntil=f==='obs'&&!a.postop?Math.max(0,a.timer-P.obsCheck):null;if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0}}
 
 function tick(dt){
   while(sim.sched.length&&sim.sched[0].t<=sim.t) spawn(sim.sched.shift());
@@ -1798,9 +1870,9 @@ function startSim(){
   const m=map();
   sim={t:0,speed:2,borp:!!state.borp,orUsed:0,alerts:new Map(),seen:{},nextScan:0,running:true,ended:false,nextId:1,agents:[],sched:makeSchedule(),fields:new Map(),rnd:mulberry32(7),
     occ:new Int16Array(m.W*m.H),stand:new Int32Array(m.W*m.H),routes:new Map(),staffRoutes:new Map(),lineR:new Map(),lines:new Set(),block:new Float32Array(m.W*m.H),
-    stats:{arrived:0,triaged:0,treated:0,supported:0,discharged:0,transferred:0,deteriorated:0,stuck:0,noTreat:0,patientWalk:0,staffWalk:0,preempted:0,triHelp:0,triHandoff:0,triLeave:0,borpRecall:0,surgStart:0,surgDone:0,surgOut:0,orAt:null,cross:0,crossIso:0,crossBody:0,crossWaste:0,carries:0,stockouts:0,supplyDelay:0,wasteDone:0,wasteLeft:0,waits:[]},showPat:false,showStaff:false};
+    stats:{arrived:0,triaged:0,treated:0,supported:0,discharged:0,transferred:0,deteriorated:0,stuck:0,shifted:0,squeezed:0,tempSite:0,noWayOut:0,noTreat:0,patientWalk:0,staffWalk:0,preempted:0,triHelp:0,triHandoff:0,triLeave:0,borpRecall:0,surgStart:0,surgDone:0,surgOut:0,orAt:null,cross:0,crossIso:0,crossBody:0,crossWaste:0,carries:0,stockouts:0,supplyDelay:0,wasteDone:0,wasteLeft:0,waits:[]},showPat:false,showStaff:false};
   sim.R=buildResources();
-  const N=m.W*m.H,W=m.W; Object.assign(sim,{tape:new Uint8Array(N),fp:new Uint8Array(N),aisle:new Uint8Array(N),wide:new Uint8Array(N),walk:new Uint8Array(N),slotCell:new Uint8Array(N),planCell:new Uint8Array(N),rw:new Uint8Array(N),rs:new Uint8Array(N),d0:new Int32Array(N),bq:new Int32Array(N),placed:new Set(),noFit:{},ver:0,serving:false,again:false});
+  const N=m.W*m.H,W=m.W; Object.assign(sim,{tape:new Uint8Array(N),fp:new Uint8Array(N),aisle:new Uint8Array(N),wide:new Uint8Array(N),walk:new Uint8Array(N),slotCell:new Uint8Array(N),planCell:new Uint8Array(N),rw:new Uint8Array(N),rs:new Uint8Array(N),d0:new Int32Array(N),bq:new Int32Array(N),placed:new Set(),keep:new Uint8Array(N),wideL:null,noFit:{},ver:0,serving:false,again:false});
   for(let i=0;i<N;i++) sim.walk[i]=WALKABLE.has(m.g[(i/W)|0][i%W])?1:0;
   zones().forEach(z=>(z.items||[]).forEach(it=>itemCells(it).forEach(([x,y])=>{sim.walk[y*W+x]=0;sim.fp[y*W+x]=1})));
   for(const k in sim.R) sim.R[k].slots.forEach(s=>sim.slotCell[s.y*W+s.x]=1);
@@ -1808,14 +1880,17 @@ function startSim(){
   // 距入口的步數：床位、座位由近到遠編號
   {const q=sim.bq,[sx,sy]=m.arrive;let h=0,t=0;sim.d0.fill(-1);q[t++]=sy*W+sx;sim.d0[q[0]]=0;
    while(h<t){const i=q[h++];for(const j of [i-1,i+1,i-W,i+W])if(j>=0&&j<N&&sim.walk[j]&&sim.d0[j]<0){sim.d0[j]=sim.d0[i]+1;q[t++]=j}}}
+  placeBorpBeds();
   // 出入口：走得到的樓梯、坡道；都沒有（例如空地）就從抵達點離開
   sim.exits=exitCells().filter(([x,y])=>sim.d0[y*W+x]>=0); if(!sim.exits.length) sim.exits=[m.arrive];
   // 必須永遠保持擔架可達的地方：檢傷等定點位子、救護車
   sim.anchors=[];for(const k in sim.R) sim.R[k].slots.forEach(s=>sim.anchors.push(s.y*W+s.x));
   zones().filter(z=>z.funcs.includes('amb')).forEach(z=>sim.anchors.push((z.y+1)*W+z.x+1));
+  sim.entries=[m.arrive,...zones().filter(z=>z.funcs.includes('amb')).map(z=>[z.x+Math.floor(z.w/2),z.y+Math.floor(z.h/2)])];
   buildNoGo();
   // 開場就到不了的管制區（門被堵住）不拿來限制擺床，否則全站都排不進去；患者會在「路被擋住」看到
-  {computeWide();reach(true,sim.rs);sim.gates=sim.gates.filter(l=>l.some(i=>sim.rs[i]))}
+  // 定點位子（藥局、檢傷等）開場擔架就到不了的也一樣，否則一張床都排不進去、全站停擺（焜哥 2026-11-15）
+  {computeWide();reach(true,sim.rs);sim.gates=sim.gates.filter(l=>l.some(i=>sim.rs[i]));sim.anchors=sim.anchors.filter(i=>sim.rs[i])}
   buildPlan();
   sim.toilets=[];for(let y=1;y<m.H-1;y++)for(let x=1;x<m.W-1;x++)if('FGR'.includes(m.g[y][x])&&[[1,0],[-1,0],[0,1],[0,-1]].some(([u,v])=>m.g[y+v][x+u]==='T'))sim.toilets.push([x,y]);
   sim.staffStart=m.staffStart||autoStaffStart(m);
@@ -1888,7 +1963,9 @@ function evaluate(){
   const note=(what,why,ref)=>notes.push({what,why,ref});
   const walkFrom=(z,to)=>{if(!z||!to)return null;const fd=getField(around(to).filter(([x,y])=>sim.walk[y*W+x]&&!sim.fp[y*W+x]),false);const v=Math.min(...around(z).map(([x,y])=>fd[y*W+x]));return v===Infinity?null:v*CELL_M};
   const tri=firstZone('triage'),maj=firstZone('major'),amb=firstZone('amb'),sto=firstZone('store'),obs=firstZone('obs'),pub=firstZone('public');
-  if(s.stuck)note(`${s.stuck} 名患者到不了目的地`,'管制區或擺設擋住唯一的路，患者不能穿越','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
+  if(s.tempSite)note(`${s.tempSite} 名患者走不到該去的區塊，就地設臨時醫療點`,'區塊或封鎖線把唯一的路堵死，患者不能穿越','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
+  if(s.noWayOut)note(`${s.noWayOut} 名患者走不到出口或救護車區，靠人力抬出`,'出口、救護車區的路被區塊堵死','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
+  if(s.shifted||s.squeezed)note(`路被患者擋住：挪動患者 ${s.shifted} 次、硬擠過去 ${s.squeezed} 次`,'床位、座位擺太滿，走道被佔走','擔架要 1 m 寬的走道（遊戲假設）');
   if(!tri) note('沒有設檢傷掛號區','患者進站後沒有分流，重症沒有優先處置','指引 p.12：檢傷區靠近入口、單一入口');
   else{const d=Math.min(...sim.exits.map(([x,y])=>Math.abs(x-tri.x)+Math.abs(y-tri.y)))*CELL_M;if(d>15)note(`檢傷區離出入口約 ${Math.round(d)} m`,'患者要先穿過站內才能分流','指引 p.12：檢傷區靠近入口')}
   if(s.crossIso)note('疑似傳染患者穿過公共空間','候診區有人開始發燒，其他等候者暴露','指引 p.14：隔離區動線不經公共空間');
@@ -1952,7 +2029,7 @@ function renderSimInfo(){
       <dt>已進站</dt><dd>${s.arrived} / ${sim.total+sim.extra} 人</dd><dt>站內</dt><dd>${inside.length} 人（等候中 ${waitingNow.length}）</dd>
       <dt>完成處置</dt><dd>${s.treated} 人${s.supported?`（跨區支援 ${s.supported}）`:''}</dd><dt>出院</dt><dd>${s.discharged} 人</dd><dt>轉出</dt><dd>${s.transferred} 人${s.deteriorated?`（含惡化 ${s.deteriorated}）`:''}</dd>
       <dt>最長等候</dt><dd>${Math.round(maxWait/60)} 分</dd><dt>患者總步行</dt><dd>${Math.round(s.patientWalk)} m</dd>
-      ${s.stuck?`<dt>到不了</dt><dd style="color:var(--bad)">${s.stuck} 人</dd>`:''}</dl>
+      ${s.shifted||s.squeezed||s.tempSite?`<dt>路被擋住</dt><dd style="color:var(--bad)">挪動患者 ${s.shifted} 次・硬擠過 ${s.squeezed} 次・臨時醫療點 ${s.tempSite} 處</dd>`:''}</dl>
     <div class="sub">人員</div><ul class="caps">${Object.keys(ROLES).filter(k=>sim.staff.some(x=>x.role===k)).map(k=>{const l=sim.staff.filter(x=>x.role===k),b=l.filter(x=>x.state==='busy'&&x.task&&x.task.k!=='need').length,o=l.filter(x=>x.task&&x.task.k==='need').length;return `<li><span>${ROLES[k].name}</span><b>${l.length} 人</b><span class="q${b+o>=l.length?' on':''}">忙 ${b}${o?`・離崗 ${o}`:''}</span></li>`}).join('')}</ul>
     <dl class="kv"><dt>人員總步行</dt><dd>${Math.round(s.staffWalk)} m</dd><dt>擔架搬運</dt><dd>${s.carries} 趟</dd>${s.preempted?`<dt>重症插隊</dt><dd>${s.preempted} 次</dd>`:''}${sim.borp?`<dt>手術</dt><dd>完成 ${s.surgDone}・開刀中 ${s.surgStart-s.surgDone} / 需要 ${sim.agents.filter(a=>a.surg).length} 人</dd>${s.borpRecall?`<dt>BORP 叫回</dt><dd>${s.borpRecall} 次</dd>`:''}`:''}<dt>物資斷貨</dt><dd>${s.stockouts} 次${s.supplyDelay?`（延誤 ${Math.round(s.supplyDelay/60)} 分）`:''}</dd><dt>廢棄物清運</dt><dd>${s.wasteDone} 袋</dd></dl>
     <div class="sub">位子與排隊</div><ul class="caps">${cap||'<li>沒有可提供服務的區塊</li>'}</ul>
