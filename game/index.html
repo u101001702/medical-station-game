@@ -12,7 +12,7 @@
   --m-floor:#ffffff; --m-wall:#33475b; --m-toilet:#c9dcef; --m-xray:#c3c9e0; --m-tent:#e3d4a6; --m-obst:#a9bfa9; --m-door:#566676; --m-fl2:#f1f4f7;
   --m-hatch:rgba(60,90,60,.13); --m-obstx:rgba(40,70,45,.5); --m-dash:rgba(255,255,255,.9); --sink:#0b84a5; --tent-lbl:#6b5418;
   --dim-bg:#ffffff; --outlbl:rgba(60,80,100,.6); --arr:#d23434; --soft:#17222d; --scale-bg:rgba(255,255,255,.9); --sw-line:rgba(23,34,45,.3); --zone-op:.55;
-  --ln-pr:#e03131; --ln-py:#e0a800; --ln-pg:#2f9e44; --ln-pi:#c2255c; --ln-pb:#8a949e; --ln-sadmin:#7048e8; --ln-sdoc:#1c3d5a; --ln-snurse:#f06595; --ln-svol:#a87900; --ln-ssub:#e8590c; --ln-waste:#0b7285;
+  --ln-pr:#e03131; --ln-py:#e0a800; --ln-pg:#2f9e44; --ln-pi:#c2255c; --ln-pb:#8a949e; --ln-sadmin:#7048e8; --ln-sdoc:#1c3d5a; --ln-snurse:#f06595; --ln-svol:#a87900; --ln-ssub:#e8590c; --ln-spharm:#0c8a6b; --ln-waste:#0b7285;
   color-scheme:light;
   --f-display:"LXGW WenKai TC","Noto Serif TC",serif;
   --f-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
@@ -26,7 +26,7 @@
   --m-floor:#123a60; --m-wall:#7fb4e3; --m-toilet:#2b5d8c; --m-xray:#3b4f78; --m-tent:#cbb98c; --m-obst:#244436; --m-door:#a9c4de; --m-fl2:#1d4f80;
   --m-hatch:rgba(127,180,227,.14); --m-obstx:rgba(160,210,170,.45); --m-dash:rgba(234,244,255,.35); --sink:#7fe0ff; --tent-lbl:#e6d7ad;
   --dim-bg:#0b1d30; --outlbl:rgba(169,196,222,.55); --arr:#ff8f85; --soft:#fff; --scale-bg:rgba(13,42,71,.8); --sw-line:rgba(234,244,255,.35); --zone-op:.42;
-  --ln-pr:#ff4d4d; --ln-py:#f2c230; --ln-pg:#3fbf6a; --ln-pi:#ff5fd2; --ln-pb:#c8d0da; --ln-sadmin:#a78bfa; --ln-sdoc:#ffffff; --ln-snurse:#ff9ecf; --ln-svol:#ffd166; --ln-ssub:#ff9f43; --ln-waste:#c0ff3e;
+  --ln-pr:#ff4d4d; --ln-py:#f2c230; --ln-pg:#3fbf6a; --ln-pi:#ff5fd2; --ln-pb:#c8d0da; --ln-sadmin:#a78bfa; --ln-sdoc:#ffffff; --ln-snurse:#ff9ecf; --ln-svol:#ffd166; --ln-ssub:#ff9f43; --ln-spharm:#5ce1b8; --ln-waste:#c0ff3e;
   color-scheme:dark;
 }
 html,body{height:100%;background:var(--blue-deep);color:var(--chalk)}
@@ -1916,9 +1916,9 @@ function drawAgents(){
 // 動線分類（焜哥 2026-11-09）：患者依類別、人員依職類、垃圾處置分開記錄
 const LINE_GROUPS=[
   {h:'患者'},{k:'pr',n:'重症',c:'var(--ln-pr)'},{k:'py',n:'中症',c:'var(--ln-py)'},{k:'pg',n:'輕症',c:'var(--ln-pg)'},{k:'pi',n:'隔離患者',c:'var(--ln-pi)'},{k:'pb',n:'死亡患者',c:'var(--ln-pb)'},
-  {h:'人員'},{k:'sadmin',n:'行政人員',c:'var(--ln-sadmin)'},{k:'sdoc',n:'醫師',c:'var(--ln-sdoc)'},{k:'snurse',n:'護理師',c:'var(--ln-snurse)'},{k:'svol',n:'志工',c:'var(--ln-svol)'},{k:'ssub',n:'替代役',c:'var(--ln-ssub)'},
+  {h:'人員'},{k:'sadmin',n:'行政人員',c:'var(--ln-sadmin)'},{k:'sdoc',n:'醫師',c:'var(--ln-sdoc)'},{k:'snurse',n:'護理師',c:'var(--ln-snurse)'},{k:'spharm',n:'藥師',c:'var(--ln-spharm)'},{k:'svol',n:'志工',c:'var(--ln-svol)'},{k:'ssub',n:'替代役',c:'var(--ln-ssub)'},
   {h:'後勤'},{k:'waste',n:'垃圾處置',c:'var(--ln-waste)'}];
-const STAFF_LINE={rad:'sdoc',doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',admin:'sadmin',vol:'svol',sub:'ssub'};
+const STAFF_LINE={rad:'sdoc',doc:'sdoc',surg:'sdoc',ortho:'sdoc',anes:'sdoc',nurse:'snurse',pharm:'spharm',admin:'sadmin',vol:'svol',sub:'ssub'};
 function markGroups(a,k){const add=g=>{let r=sim.lineR.get(g);if(!r){r=new Map();sim.lineR.set(g,r)}r.set(k,(r.get(k)||0)+1)};
   if(a.staff){const g=STAFF_LINE[a.role];if(g)add(g);if(a.task&&a.task.k==='waste'&&a.task.got)add('waste');return}
   add('p'+(a.exposure?'i':a.cat));
