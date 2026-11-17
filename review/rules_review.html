@@ -1,0 +1,225 @@
+<title>急救站遊戲規則審核</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 版面：審核表。頂端進度列 sticky，下方依章節列出每條規則，右側三顆判定鈕＋備註 */
+:root{
+  --bg:#f5f7fa; --paper:#ffffff; --ink:#14263a; --soft:#5b6b7d; --line:#d9e1ea;
+  --accent:#1f5c99; --ok:#1e7a46; --ok-bg:#e3f3ea; --chg:#b4511c; --chg-bg:#fbeadf; --ask:#7a5a00; --ask-bg:#fbf1d2;
+  --tag-g:#e3ecf7; --tag-k:#efe6f8; --tag-a:#eef0f2;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1a27; --paper:#15263a; --ink:#e6eef7; --soft:#9fb2c6; --line:#2a3f57;
+  --accent:#7fb4e3; --ok:#6fd49a; --ok-bg:#163a29; --chg:#f2a173; --chg-bg:#41261a; --ask:#f0cf6a; --ask-bg:#3a3115;
+  --tag-g:#1d3552; --tag-k:#33264a; --tag-a:#22313f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1a27; --paper:#15263a; --ink:#e6eef7; --soft:#9fb2c6; --line:#2a3f57;
+  --accent:#7fb4e3; --ok:#6fd49a; --ok-bg:#163a29; --chg:#f2a173; --chg-bg:#41261a; --ask:#f0cf6a; --ask-bg:#3a3115;
+  --tag-g:#1d3552; --tag-k:#33264a; --tag-a:#22313f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 60px}
+header.top{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+h1{font-size:1.55rem;margin:0;text-wrap:balance}
+.lead{color:var(--soft);margin:0;max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.82rem;color:var(--soft)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:18px}
+.prog{flex:1 1 220px;min-width:0}
+.prog .nums{font-size:.85rem;color:var(--soft);font-variant-numeric:tabular-nums}
+.track{height:6px;border-radius:3px;background:var(--line);overflow:hidden;display:flex;margin-top:4px}
+.track i{display:block;height:100%}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;cursor:pointer}
+.fbtn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:2px 12px;font-size:.85rem}
+.fbtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.save{font-size:.8rem;color:var(--soft);min-width:9em;text-align:right}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88rem;margin-bottom:8px}
+nav.toc a{color:var(--accent);text-decoration:none}
+nav.toc a:hover{text-decoration:underline}
+section{margin-top:26px}
+section h2{font-size:1.1rem;margin:0 0 8px;display:flex;gap:10px;align-items:baseline}
+section h2 small{font-weight:400;font-size:.8rem;color:var(--soft)}
+.rule{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;margin-bottom:8px}
+.rule[data-s="ok"]{border-left:4px solid var(--ok)}
+.rule[data-s="change"]{border-left:4px solid var(--chg)}
+.rule[data-s="ask"]{border-left:4px solid var(--ask)}
+.rule .txt{min-width:0}
+.rule .id{font-family:var(--f-mono);font-size:.75rem;color:var(--soft);margin-right:6px}
+.rule p{margin:0}
+.rule ul{margin:4px 0 0;padding-left:1.2em}
+.tag{display:inline-block;font-size:.72rem;border-radius:4px;padding:0 6px;margin:4px 6px 0 0;color:var(--ink)}
+.tag.v{background:var(--ok-bg);color:var(--ok);font-weight:700}.tag.g{background:var(--tag-g)} .tag.k{background:var(--tag-k)} .tag.a{background:var(--tag-a)}
+.acts{display:flex;gap:6px;align-items:flex-start}
+.acts button{border:1px solid var(--line);background:var(--paper);color:var(--soft);border-radius:6px;padding:2px 10px;font-size:.85rem;white-space:nowrap}
+.acts button[aria-pressed="true"][data-v="ok"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:700}
+.acts button[aria-pressed="true"][data-v="change"]{background:var(--chg-bg);border-color:var(--chg);color:var(--chg);font-weight:700}
+.acts button[aria-pressed="true"][data-v="ask"]{background:var(--ask-bg);border-color:var(--ask);color:var(--ask);font-weight:700}
+.note{grid-column:1/-1}
+.note textarea{width:100%;min-height:2.6em;resize:vertical;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;font-size:.9rem;padding:6px 8px}
+button:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.empty{color:var(--soft);font-size:.9rem}
+.offline{background:var(--ask-bg);color:var(--ask);border-radius:8px;padding:8px 12px;font-size:.88rem;margin-bottom:12px}
+@media (max-width:620px){.rule{grid-template-columns:minmax(0,1fr)}.save{text-align:left}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <h1>急救站佈局挑戰：遊戲規則審核</h1>
+  <p class="lead">目前遊戲（V47）實際在跑的所有規則。綠色「11-18 已依回饋修改」是照你上次的備註改好的，請再看一次。每條按「同意」「要改」或「有疑問」，要改的寫在備註，存檔後 Claude 讀得到。</p>
+  <div class="legend"><span><span class="tag g">指引</span>急救站設置參考指引第二版（頁碼＝PDF 頁）</span><span><span class="tag k">焜哥決定</span>你定過的規則（括號是日期）</span><span><span class="tag a">遊戲假設</span>自訂參數，非指引內容</span><span><span class="tag v">11-18 已依回饋修改</span>照你的備註改好</span></div>
+</header>
+<div id="offline" class="offline" hidden>這個畫面沒有連上審核資料庫，按的結果只留在這台裝置。請在 claude.ai 登入後打開，結果才會存回去。</div>
+<div class="bar" role="region" aria-label="審核進度">
+  <div class="prog"><div class="nums" id="nums">載入中…</div><div class="track" id="track"></div></div>
+  <div class="filters" role="group" aria-label="篩選">
+    <button class="fbtn" type="button" data-f="all" aria-pressed="true">全部</button>
+    <button class="fbtn" type="button" data-f="todo" aria-pressed="false">未審</button>
+    <button class="fbtn" type="button" data-f="change" aria-pressed="false">要改</button>
+    <button class="fbtn" type="button" data-f="ask" aria-pressed="false">有疑問</button>
+  </div>
+  <div class="save" id="save" aria-live="polite"></div>
+</div>
+<nav class="toc" id="toc" aria-label="章節"></nav>
+<main id="list"></main>
+</div>
+
+<script>
+const G='g',K='k',A='a',V='v';
+const SECTIONS=[
+ {id:'site',t:'場地與佈置',rules:[
+  ['S1','地圖格子 1 格 = 0.5 m（4 格 = 1 m²，約 13 格 = 1 坪）',[[K,'10-30']]],
+  ['S2','內建場地：教室型（3 間教室各 8 × 9 m＋2 m 走廊；西端樓梯擔架不能過、東端坡道可以、教室 3 後門有台階、只有一間有水槽）；衛生所型（19 × 12 m，前門台階、後門平面、X 光室設備固定不能改用途）；地下空間（19 × 14 m，唯一出入口是西側樓梯）；長方形大廳；長條場地',[[K,'11-01、11-14'],[A,'場地虛構']]],
+  ['S3','自訂場地：學員現場畫房間、塗格子、點插座／水槽／抵達點；可上傳照片當底圖並量比例尺；沒有抵達點或放不下 7 × 3 m 救護車就不能開始；預設載入「長方形大廳」範本',[[K,'11-02、11-14']]],
+  ['S4','功能區用拖曳畫範圍，大小由學員決定；坪數不設下限，卡片只顯示建議值。佈置時右側「佈置檢查」與地圖驚嘆號會提示：各區容量（幾床、幾個座位，床位直接畫在地圖上；0 床標紅並說明原因）、患者或擔架走不到的區塊、指引配置原則（檢傷離出入口 >15 m、隔離／廢棄物／遺體緊貼公共空間、廢棄物緊貼休息區、行政與醫療合併、手術室緊貼遺體區，「緊貼」＝相距 1 m 內）',[[K,'11-18'],[G,'p.12–16、p.24'],[V,'11-18 已依回饋修改']]],
+  ['S5','建議坪數：檢傷 4、重傷 4、中傷 3、輕傷 4、留觀 6、隔離 3、藥局 4、庫備品 4、公共空間 5、廢棄物 2、行政 5、遺體 5；重傷／中傷／輕傷三區合計 11 坪對應指引「診療處置區 11 坪」',[[G,'p.12–16'],[A,'三區拆分與留觀、隔離坪數']]],
+  ['S6','相同功能的區塊緊貼在一起就算同一區（L 形也是）：外框畫一圈、名稱與坪數只標一次；拼起來是長方形的仍合成一塊',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['S7','封鎖線：寬 0.5 m，水平或垂直，可封走道、門、空地；患者與擔架不能穿過，工作人員可以；不加不扣分',[[K,'11-01']]],
+  ['S8','帳篷：方形或圓形（含橢圓），大小、數量不限，只能搭在室外；外圍 0.5 m 是帳篷布與營釘不能走；門寬 0.5 m 起、預設 1 m，開在每邊中間，不到 1 m 擔架過不去；內部算室內',[[K,'11-02'],[G,'附件五 p.41']]],
+  ['S9','戶外空地（沒搭帳篷）或太小的區塊排不出床位和座位：佈置檢查會標紅並說明原因',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+ ]},
+ {id:'patient',t:'患者',rules:[
+  ['P1','4 小時共 24 人＋1 名死亡：輕 12、中 7（含 1 名疑似傳染）、重 5。前 2 小時門診 12 人穩定進站；第 2 小時起外傷 MCI 11 人＋死亡 1 人約 7 分鐘內湧入；第 3 小時後再 1 名輕症（多的 4 人門診、MCI 各 2）',[[K,'11-18'],[G,'p.6 只寫每日至少收治 50 人'],[V,'11-18 已依回饋修改']]],
+  ['P2','動線：紅 入口→檢傷→重傷區→留觀→救護車轉出；黃 →檢傷→候診→中傷區→留觀或領藥出院；綠 →檢傷→候診→輕傷區→藥局→出口；黑 →檢傷→遺體區；疑似傳染 →檢傷→隔離區（不經公共空間）→轉出',[[K,'10-31'],[G,'p.12–16']]],
+  ['P3','分流與借床：紅進重傷區、黃進中傷區、綠進輕傷區。客滿時紅可借中傷區、再借輕傷區；黃色躺床的可借重傷區、再借輕傷區，坐著的只用中傷、輕傷區；空床先給重症。輕症不跨區，輕傷區滿了就在公共空間候診',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['P4','處置時間：輕 5 分、中 15 分、重 30 分、隔離 15 分；檢傷每人 1 分；領藥 2 分',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['P5','留觀：中症一半要留觀；中症 30 分、重症 20 分後轉出；留觀中 10% 惡化轉出（床邊 3 m 內有生理監視器時減半）',[[A,''],[G,'教材-1 p.35（惡化）']]],
+  ['P6','輕症 10% 處置後轉重症：改躺、用擔架移到重傷區（等床時留在原位），再照重症處置與轉出；基本 20 人固定 1 人',[[K,'10-31']]],
+  ['P7','移動速度：步行 1 m/s；擔架減半；走樓梯步行再減半、擔架只剩 2 成',[[A,'']]],
+  ['P8','佔地：坐 1 × 1 m、躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺（擔架來的一定躺）；疑似傳染躺',[[K,'10-30']]],
+  ['P9','床位（所有躺床：重傷、中傷、留觀、隔離、BORP 檢傷分類區、術後恢復區）：床同方向成排；床頭外 0.5 m 站醫師做頭部處置，頭對頭兩床可共用；重傷區的床兩個長邊外各 0.5 m 站人處置（可與隔壁床共用、區塊邊緣也要留），其他區兩床一組並排、組間 0.5 m，每床至少一側站得了人；每兩排之間 1 m 走道（放不下時 0.5 m）。候診座位不分組，有空位就整排排滿。遺體區床仍緊貼併排',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['P10','（已併入 P9）重症床長邊外的 0.5 m 走道',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['P11','（已併入 P9）床頭 0.5 m 改為所有躺床都要，且頭對頭兩床可共用',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['P12','患者是障礙物不能跨越；擺床時一定留通道（擔架 1 m、步行 0.5 m）。擺下一張床只要不讓「原本到得了的人」變到不了就可以；擔架從入口或救護車區算起',[[K,'10-30'],[A,'11-15 修正停擺']]],
+  ['P13','患者不能穿越遺體區、庫備品區、廢棄物區、手術室（送往該區的除外）；其他功能區有走道就繞走道；公共空間與救護車區可通行；工作人員不受限',[[K,'10-31'],[A,'']]],
+  ['P14','以坪數算位子的區：檢傷每 2 坪 1 位、藥局窗口每 2 坪 1 位、遺體每 1.25 坪 1 位；面積連 1 位都不夠時仍給 1 位，但處置時間 ×1.8',[[A,'']]],
+  ['P15','擁擠：每格最多 2 人（擔架算 2）；被擋 3 秒後硬擠過去',[[A,'']]],
+  ['P16','路被擋住：卡 1 分鐘先把擋路的床位或座位挪到同功能區別的位子（被挪的人處置多 1 分）；挪不動，卡 2 分鐘從患者旁邊擠過去、速度減半（牆、設備、封鎖線、管制區照樣不能穿）；被區塊整個堵死，卡 5 分鐘就地設臨時醫療點；要出站或轉送的人力抬出。不自動搬動功能區',[[K,'11-15'],[A,'秒數']]],
+  ['P17','X 光（有 X 光機的場地才有，目前衛生所）：診療、隔離患者約 5 成要照，診療做到 4 成時離床去照、一次 2 分鐘，照完回原床做完；床位保留；擔架來回各 2 人抬；機器一次一人；疑似傳染照完消毒 5 分鐘；走不到 X 光室就不照',[[K,'11-17（5 成、2 分）'],[A,'4 成離床、消毒 5 分']]],
+ ]},
+ {id:'staff',t:'人員',rules:[
+  ['T1','一般關 9 人：醫師 2、護理師 3（其中 1 位是檢傷護理師）、藥師 1、行政 1、志工 1、替代役 1',[[K,'10-31']]],
+  ['T2','處置人力：輕症 1 醫師或 1 護理師（誰先空誰來）；紅、黃與隔離 1 醫師＋1 護理師全程；檢傷、留觀評估（2 分）各 1 護理師；領藥藥師',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['T3','重症插隊：沒有空閒人手時中斷綠、黃的處置先救重症，先調綠再調黃；被中斷的患者暫停，等人回來接著做',[[K,'']]],
+  ['T4','檢傷護理師順序：①檢傷重症 ②重症區沒有空閒護理師時協助重症初步處置，有人交接、滿 5 分鐘或有重症等檢傷就回 ③沒有重症需要她時才檢傷其他人；她離崗時由其他空閒護理師代班',[[K,'11-07']]],
+  ['T5','檢傷護理師空檔協助：檢傷區沒人在等時，可進診療區（重、中、輕傷區）協助任何顏色患者，不限時；協助中有紅色來檢傷就立刻回（手上的患者改等其他護理師），黃、綠色來檢傷就等她做完手上這位',[[K,'11-17']]],
+  ['T6','放射師（可勾選）：有 X 光機的場地可加派 1 名放射師。沒有時由醫師操作 X 光，醫師工作順序：紅色患者＞紅色 X 光＞黃色患者＞黃色 X 光＞綠色患者＞綠色 X 光；疑似傳染比照黃色',[[K,'11-17']]],
+  ['T7','擔架每次移動 2 人，由志工、替代役、行政負責；補貨、廢棄物清運、領物資另外放射師、藥師也可以做，忙不過來就要等',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['T8','領物資：躺床患者處置時，志工或替代役到藥局、庫備品區各停 30 秒再送到床邊；處置做到一半物資還沒到就暫停並計入延誤；走路的輕症自己去藥局領藥',[[K,'10-31'],[A,'30 秒']]],
+  ['T9','生理需求：每人每場上廁所 1 次（3 分）、行動糧 1 次（5 分）、喝水 2 次（1 分）；拖超過 30 分就先離崗；離崗期間該區少一人',[[K,''],[A,'時間']]],
+  ['T10','防卡死：工作人員走不到目的地超過 1 分鐘就跳過那一站；走不到廁所、休息區就原地解決',[[A,'']]],
+ ]},
+ {id:'logi',t:'物資、電力與區內設備',rules:[
+  ['L1','物資三類：藥品、衛材、重症設備。各區起始藥品 6、衛材 8、重症設備 2（擺物資櫃多 5 成）；低於三分之一由庫備品區補貨；斷貨時 3 分鐘後臨時變通',[[A,'']]],
+  ['L2','廢棄物：診療、留觀、隔離每處置 1 人產生 1 袋，累積 3 袋就清運到廢棄物區',[[A,'']]],
+  ['L3','電力：每區接最近插座，2 m 內直插，否則拉延長線（最多 5 條、每條 30 m、每個插座接 2 區）；插座不夠或太遠改接發電機（每台供 4 區，發電機必須放室外）；沒接到電的區處置 ×1.3（照明與設備不足）',[[G,'附件五'],[A,'數字']]],
+  ['L4','延長線經過的格子：擔架速度 ×0.6、步行 ×0.85（絆倒風險）',[[A,'']]],
+  ['L5','第二層區內設備（診療、留觀）：外傷治療車在床邊 3 m 內處置 ×0.9；急救藥箱 3 m 內重症處置 ×0.95；生理監視器 3 m 內留觀惡化減半；物資櫃多存 5 成。床頭方向、插座配置尚未做',[[G,'附件二～四'],[A,'倍率']]],
+ ]},
+ {id:'event',t:'事件卡（第二輪隨機抽一張，第 100 分鐘發生）',rules:[
+  ['E1','突然湧入 8 名外傷（紅 1、黃 3、綠 4）',[[G,'p.12 公共空間轉檢傷擴充']]],
+  ['E2','疑似傳染病患 2 名',[[G,'p.14']]],
+  ['E3','停電 30 分鐘：有發電機不受影響；沒有的話 30 分鐘內處置時間 ×1.5',[[G,'附件五'],[A,'×1.5']]],
+  ['E4','救護車 2 小時到不了：重症無法轉出，留觀床被長期占用',[[G,'p.13']]],
+  ['E5','一名死亡、家屬在場：地圖在入口標「家屬在場」；遺體經過公共空間時標「家屬看見遺體」，志工被拉去安撫 5 分鐘；結果卡寫出家屬情緒',[[G,'p.16'],[V,'11-18 已依回饋修改']]],
+  ['E6','一名護理師受傷下線，直到本輪結束',[[A,'']]],
+  ['E7','庫備品區淹水：庫房在地圖上標「淹水」；各區現有物資減半、不能再補貨；結果卡寫出物資從幾件剩幾件、淹水後斷貨幾次',[[G,'p.14–15'],[V,'11-18 已依回饋修改']]],
+  ['E8','暴力歹徒企圖闖入：入口標「歹徒闖入」，被拉去處理的人走到入口（標「處理中」）；檢傷區在入口 15 m 內 5 分鐘、否則 15 分鐘；結果卡寫出誰被拉走幾分鐘',[[G,'p.8'],[A,'時間'],[V,'11-18 已依回饋修改']]],
+  ['E9','小偷闖入偷竊：庫房標「小偷」；庫房在行政區旁（約 10 m 內）當場被發現沒有損失，否則各區藥品被偷一半；結果卡寫出藥品從幾件剩幾件',[[G,'p.8、p.15'],[A,'距離'],[V,'11-18 已依回饋修改']]],
+ ]},
+ {id:'score',t:'結算與回饋',rules:[
+  ['R1','7 項指標與門檻：人員總步行 ≤ 5000 m、最長等候 ≤ 110 分、物資斷貨 0 次、患者移動 ≤ 3000 m、患者被搬運 ≤ 30 趟、處置因取物資延誤 0 分、動線交叉 0 次（隔離、遺體、廢棄物穿過公共空間或診療區）',[[A,'10-31 依 4 小時重調']]],
+  ['R2','星等：全部達標或只差 1 項 3 星、差 3 項內 2 星，其餘 1 星；缺主要功能區（檢傷、診療、留觀、隔離、藥局、公共空間、遺體、庫備品、廢棄物）最多 1 星',[[A,'']]],
+  ['R3','回饋格式：發生什麼 → 為什麼 → 指引怎麼說（頁碼）；另記錄跨區支援、重症插隊、擋路處理、X 光等次數',[[K,'']]],
+  ['R4','隱藏結局第一輪就會出現：疑似傳染穿過公共空間 → 候診區有人發燒；遺體穿過公共空間 → 家屬情緒失控，志工被拉去安撫 5 分鐘',[[K,''],[G,'p.14、p.16']]],
+  ['R5','現場狀況：模擬中每 15 秒偵測等醫師、等擔架、床位客滿、排隊、物資、動線交叉、路被擋住、站著等候等；佈置階段改由「佈置檢查」提示（見 S4）',[[K,'11-18'],[A,'門檻'],[V,'11-18 已依回饋修改']]],
+ ]},
+ {id:'borp',t:'第三類急救站（BORP 關）',rules:[
+  ['B1','上方開關切換；一般關與 BORP 關各存一份配置；多 3 張卡：BORP 檢傷分類區、手術室、術後恢復區（可併留觀區）',[[K,'11-07、11-09'],[G,'p.24、附件二十三']]],
+  ['B2','MCI 5 名重症中先到的 3 名需要損傷控制手術，都排進手術室依序開刀、一次一台；4 小時到就結束，所以會看到第 2 台開到一半。指標仍以完成 1 台為目標',[[K,'11-18'],[V,'11-18 已依回饋修改']]],
+  ['B3','開刀流程：檢傷 → BORP 檢傷分類區術前評估 10 分 → 手術 80 分 → 術後恢復 10 分 → 救護車後送；缺區退路：無檢傷分類區直接進手術室、無恢復區到留觀區、都沒有在手術台上恢復',[[K,'11-07（80 分、10 分）']]],
+  ['B4','BORP 9 人開場就在站內：急診醫師、急診護理師、衛勤（檢傷分類組）；外科、骨科、麻醉（手術組）；護理師 2（恢復組）；衛勤（行政組）。空閒時支援一般區，BORP 有病人時叫回',[[G,'附件二十四、p.27']]],
+  ['B5','手術室是無菌區，患者與擔架不能穿過，不能和其他功能合併；正中央擺 1 台手術台（每 7 坪 1 台）',[[A,'']]],
+  ['B6','床位：BORP 檢傷分類區、術後恢復區每 2 坪 1 床；遺體區每 1.25 坪 1 床、可併排相連。目前床只是畫出來，不會擋路',[[K,'11-15'],[A,'']]],
+  ['B7','手術室冷氣 900–1200 W，接電時佔 2 份插座量；沒接到電手術 ×1.3。手術室要擺流動洗手台或場地水槽在 3 m 內，否則每台刀 +10 分',[[G,'附件五'],[A,'+10 分']]],
+  ['B8','BORP 關多 2 項指標：需手術者進站到開刀 ≤ 30 分、完成手術 1 台；沒擺手術室最多 1 星',[[A,'']]],
+ ]},
+];
+const ALL=SECTIONS.flatMap(s=>s.rules.map(r=>r[0]));
+const LABEL={ok:'同意',change:'要改',ask:'有疑問'};
+let state={},filter='all',db=null,editing=new Set();
+try{state=JSON.parse(localStorage.getItem('rules-review')||'{}')}catch(e){}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function tagHTML(tags){return tags.map(([k,v])=>`<span class="tag ${k}">${k===V?esc(v):(k===G?'指引':k===K?'焜哥決定':'遊戲假設')+(v?' '+esc(v):'')}</span>`).join('')}
+function build(){
+  $('#toc').innerHTML=SECTIONS.map(s=>`<a href="#${s.id}">${esc(s.t)}</a>`).join('');
+  $('#list').innerHTML=SECTIONS.map(s=>`<section id="${s.id}"><h2>${esc(s.t)}<small>${s.rules.length} 條</small></h2>${s.rules.map(([id,txt,tags])=>`
+    <article class="rule" id="r-${id}" data-id="${id}">
+      <div class="txt"><p><span class="id">${id}</span>${esc(txt)}</p><div>${tagHTML(tags)}</div></div>
+      <div class="acts" role="group" aria-label="${id} 判定">${['ok','change','ask'].map(v=>`<button type="button" data-v="${v}" aria-pressed="false">${LABEL[v]}</button>`).join('')}</div>
+      <div class="note"><textarea id="n-${id}" aria-label="${id} 備註" placeholder="備註（要改成怎樣、或你的疑問）"></textarea></div>
+    </article>`).join('')}<p class="empty" hidden>這一章沒有符合篩選的規則</p></section>`).join('');
+}
+function paint(){
+  let ok=0,ch=0,ask=0;
+  document.querySelectorAll('.rule').forEach(el=>{const id=el.dataset.id,r=state[id]||{};
+    el.dataset.s=r.status||'';
+    el.querySelectorAll('.acts button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===r.status)));
+    const ta=el.querySelector('textarea');if(!editing.has(id)&&ta.value!==(r.note||''))ta.value=r.note||'';
+    if(r.status==='ok')ok++;else if(r.status==='change')ch++;else if(r.status==='ask')ask++;
+    const show=filter==='all'||(filter==='todo'?!r.status:r.status===filter);el.hidden=!show});
+  document.querySelectorAll('section').forEach(s=>{s.querySelector('.empty').hidden=!!s.querySelector('.rule:not([hidden])')});
+  const n=ALL.length,done=ok+ch+ask;
+  $('#nums').textContent=`已審 ${done} / ${n} 條・同意 ${ok}・要改 ${ch}・有疑問 ${ask}`;
+  const w=v=>(v/n*100).toFixed(2)+'%';
+  $('#track').innerHTML=`<i style="width:${w(ok)};background:var(--ok)"></i><i style="width:${w(ch)};background:var(--chg)"></i><i style="width:${w(ask)};background:var(--ask)"></i>`;
+}
+function keepLocal(){try{localStorage.setItem('rules-review',JSON.stringify(state))}catch(e){}}
+async function persist(id){
+  keepLocal();
+  if(!db){$('#save').textContent='只存在這台裝置';return}
+  $('#save').textContent='儲存中…';
+  try{await db.collection('reviews').doc(id).set({status:state[id].status||null,note:state[id].note||'',at:new Date().toISOString()});$('#save').textContent='已儲存'}
+  catch(e){$('#save').textContent='沒存成功，請再按一次'}
+}
+build();paint();
+document.addEventListener('click',ev=>{
+  const f=ev.target.closest('.fbtn');if(f){filter=f.dataset.f;document.querySelectorAll('.fbtn').forEach(b=>b.setAttribute('aria-pressed',String(b===f)));paint();return}
+  const b=ev.target.closest('.acts button');if(!b)return;const id=b.closest('.rule').dataset.id,r=state[id]=state[id]||{};
+  r.status=r.status===b.dataset.v?null:b.dataset.v;paint();persist(id)});
+const timers={};
+document.addEventListener('input',ev=>{const ta=ev.target.closest('textarea');if(!ta)return;const id=ta.closest('.rule').dataset.id;editing.add(id);
+  (state[id]=state[id]||{}).note=ta.value;clearTimeout(timers[id]);timers[id]=setTimeout(()=>persist(id),800)});
+document.addEventListener('focusout',ev=>{const ta=ev.target.closest&&ev.target.closest('textarea');if(!ta)return;const id=ta.closest('.rule').dataset.id;editing.delete(id);clearTimeout(timers[id]);if(state[id])persist(id)});
+(async()=>{
+  const d=window.claude&&window.claude.use?await window.claude.use('db'):null;
+  if(!d){$('#offline').hidden=false;$('#save').textContent='只存在這台裝置';return}
+  db=d;$('#save').textContent='已連上';
+  db.collection('reviews').onSnapshot(snap=>{snap.docs.forEach(doc=>{const v=doc.data();if(v)state[doc.id]={status:v.status||null,note:v.note||''}});keepLocal();paint()},()=>{$('#save').textContent='資料庫連線中斷'});
+})();
+</script>
