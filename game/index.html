@@ -190,6 +190,8 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .simming .evpick,.simming #tutBtn{display:none}
 .tut{position:fixed;inset:0;z-index:70;background:rgba(5,16,30,.72);display:grid;place-items:center;padding:16px}.tut[hidden]{display:none}
 .tutbox{max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}.tutbox h3{font-family:var(--f-display);margin:4px 0;font-size:19px}.tutbox small{font-family:var(--f-mono);color:var(--chalk-dim)}
+.itemfx{border:1px solid var(--panel-line);border-left:3px solid var(--hl);border-radius:5px;padding:6px 8px;margin:6px 0;font-size:13px;line-height:1.5}.itemfx small{opacity:.8}
+.fxline{fill:none;stroke-width:.12;stroke-dasharray:.35 .25}
 .items{display:grid;gap:5px;margin:6px 0}.items button{text-align:left}.items .tbtn.on{outline:2px solid var(--hl)}
 .alerts{list-style:none;margin:6px 0;padding:0;display:grid;gap:5px}.alerts li{border-left:3px solid var(--hl);padding:3px 8px;font-size:12.5px;background:var(--blue);border-radius:0 5px 5px 0}.alerts li.bad{border-left-color:var(--bad)}.alerts b{display:block;font-weight:700}.alerts span{color:var(--chalk-dim)}
 .evlog{border:1px solid var(--bad);border-radius:6px;padding:6px 8px;margin:8px 0;font-size:12.5px}.evlog b{color:var(--bad)}
@@ -798,7 +800,8 @@ function drawZones(){
   new Set([...grp.values()].filter(G=>G.m.length>1)).forEach(G=>{const W=map().W,cells=new Set();G.m.forEach(z=>zoneCells(z).forEach(([x,y])=>cells.add(y*W+x)));
     let d='';cells.forEach(i=>{const x=i%W,y=(i/W)|0;if(!cells.has(i-W))d+=`M${x} ${y}h1`;if(!cells.has(i+W))d+=`M${x} ${y+1}h1`;if(x===0||!cells.has(i-1))d+=`M${x} ${y}v1`;if(x===W-1||!cells.has(i+1))d+=`M${x+1} ${y}v1`});
     el('path',{d,class:'gline',stroke:FUNCS[G.lead.funcs[0]].color},zoneLayer)});
-  renderCards(); renderInfo(); save(); if(mode==='layout') scheduleCheck();
+  if(selItem&&!(zones().find(q=>q.id===selItem.z)?.items||[])[selItem.i])selItem=null;
+  renderCards(); renderInfo(); save(); drawItemFx(); if(mode==='layout') scheduleCheck();
 }
 function applyZoom(){
   const m=map(); const availW=wrap.clientWidth-2, availH=wrap.clientHeight-2;
@@ -862,7 +865,7 @@ function renderInfo(){
       <div class="sub">包含的功能</div>
       <div class="funcs">${z.funcs.map((f,i)=>`<div class="func"><span class="sw" style="background:${FUNCS[f].color}"></span>${names[i]}${z.funcs.length>1?`<button type="button" data-rmf="${f}" aria-label="移除${names[i]}">移除</button>`:''}</div>`).join('')}</div>
       <p class="desc">${z.funcs.map(f=>FUNCS[f].desc).join('<br>')}</p>
-      ${hasItems(z)?`<div class="sub">區內配置</div><p class="desc">${z.funcs.includes('or')?'選一項後點區塊內的格子。手術室要有流動洗手台（或場地水槽在 3 m 內），否則每台刀多 10 分刷手、清洗器械。':'選一項後點區塊內的格子。治療車、藥箱在床邊 3 m 內處置較快；監視器在 3 m 內留觀惡化較少；物資櫃讓這區多存 5 成物資。'}</p><div class="items">${itemsOf(z).map(k=>{const on=(z.items||[]).some(i=>i.k===k);return `<button class="tbtn${itemMode===k?' on':''}" type="button" data-item="${k}">${ITEMS[k].name}${on?'（已擺，再點一次重擺）':''}</button>`}).join('')}</div>`:''}
+      ${hasItems(z)?itemPanel(z):''}
       <div class="acts"><button class="tbtn" type="button" id="rot">旋轉 90°</button><button class="tbtn danger" type="button" id="del">刪除區塊</button><button class="tbtn" type="button" id="desel">完成</button></div>
       <p class="desc">拖曳區塊可以移動，拖右下角黃點可以調整大小。</p>`;
     return;
@@ -901,21 +904,52 @@ function renderInfo(){
 }
 
 // ===== 區內配置（Sprint 7）=====
-const ITEMS={cart:{name:'外傷治療車',ch:'車',w:2,h:1,color:'#ffb86b'},monitor:{name:'生理監視器',ch:'監',w:1,h:1,color:'#7fe0ff'},drug:{name:'急救藥箱',ch:'藥',w:1,h:1,color:'#ff9db0'},cabinet:{name:'物資櫃',ch:'櫃',w:2,h:1,color:'#c9d65b'},sink:{name:'流動洗手台',ch:'洗',w:1,h:1,color:'#7fe0ff'}};
+const ITEMS={cart:{name:'外傷治療車',ch:'車',w:2,h:1,color:'#ffb86b',r:3,eff:'範圍內的診療床，處置時間 ×0.9（快 1 成）'},
+  monitor:{name:'生理監視器',ch:'監',w:1,h:1,color:'#7fe0ff',r:3,eff:'範圍內的留觀床，惡化機率減半'},
+  drug:{name:'急救藥箱',ch:'藥',w:1,h:1,color:'#ff9db0',r:3,eff:'範圍內的診療床，重症處置時間 ×0.95'},
+  cabinet:{name:'物資櫃',ch:'櫃',w:2,h:1,color:'#c9d65b',r:0,eff:'這區多存 5 成物資，每多 1 個再多 5 成；不看距離'},
+  sink:{name:'流動洗手台',ch:'洗',w:1,h:1,color:'#7fe0ff',r:0,eff:'手術室有洗手台，每台刀不必多花 10 分刷手、清洗器械'}};
+// 器材一區可以擺多個、不設上限；同一張床旁邊多台不疊加（焜哥 2026-11-18）。範圍＝器材到床最近的距離 3 m 內（直線距離），只算同一區
+const gapCells=(a,b)=>{const dx=Math.max(a.x-(b.x+b.w),b.x-(a.x+a.w),0),dy=Math.max(a.y-(b.y+b.h),b.y-(a.y+a.h),0);return Math.hypot(dx,dy)};
+const itemRect=it=>({x:it.x,y:it.y,w:ITEMS[it.k].w,h:ITEMS[it.k].h});
+const inRange=(it,r)=>gapCells(itemRect(it),r)*CELL_M<=ITEMS[it.k].r;
 const hasItems=z=>z.funcs.some(f=>isTreat(f)||f==='obs'||f==='or');
 const itemsOf=z=>z.funcs.includes('or')?['sink']:['cart','monitor','drug','cabinet'];
 // 手術室有洗手台：區內擺流動洗手台，或場地水槽在手術室 3 m 內（附件五：手術區專用流動洗手台 1 座）
 function orSink(z){if((z.items||[]).some(i=>i.k==='sink'))return true;const m=map();
   return Object.keys(m.feats).some(k=>{if(m.feats[k]!=='sink')return false;const [x,y]=k.split(',').map(Number),dx=Math.max(z.x-x,x-(z.x+z.w-1),0),dy=Math.max(z.y-y,y-(z.y+z.h-1),0);return (dx+dy)*CELL_M<=3})}
-let itemMode=null;
+let itemMode=null,selItem=null,itemHover=null;
+// 範圍內的床（佈置檢查排出來的床位；同一區才算）
+function bedsInRange(z,it){if(!ITEMS[it.k].r||!lastCheck)return null;return lastCheck.plan.filter(r=>r.bed&&zoneOfRect(r)===z&&inRange(it,r)).length}
+function itemPanel(z){const its=z.items||[],cnt=k=>its.filter(i=>i.k===k).length;
+  const intro=z.funcs.includes('or')?'選一項後點區塊內的格子。手術室要有流動洗手台（或場地水槽在 3 m 內），否則每台刀多 10 分刷手、清洗器械。':'選一項後點區塊內的格子，可以連續擺好幾個；點地圖上已擺的器材可以看範圍、移除。同一張床旁邊擺好幾台，效果不會疊加。';
+  let fx='';
+  if(itemMode){const I=ITEMS[itemMode];fx=`<div class="itemfx"><b>擺放中：${I.name}</b><br>${I.eff}${I.r?`<br>虛線圈＝效果範圍（${I.r} m 內）`:''}<br><small>點區塊內格子擺放；點區塊外或再按一次按鈕結束</small></div>`}
+  else if(selItem&&selItem.z===z.id&&its[selItem.i]){const it=its[selItem.i],I=ITEMS[it.k],n=bedsInRange(z,it);
+    fx=`<div class="itemfx"><b>${I.name}</b><br>${I.eff}${I.r?`<br>範圍：${I.r} m 內${n!=null?`，目前涵蓋 ${n} 張床`:''}`:''}<div class="acts"><button class="tbtn danger" type="button" id="itemDel">移除這個</button></div></div>`}
+  return `<div class="sub">區內配置</div><p class="desc">${intro}</p><div class="items">${itemsOf(z).map(k=>{const n=cnt(k);return `<button class="tbtn${itemMode===k?' on':''}" type="button" data-item="${k}">${ITEMS[k].name}${n?`（已擺 ${n} 個）`:''}</button>`}).join('')}</div>${fx}${its.length?'<button class="tbtn" type="button" id="itemClr">清除這區所有器材</button>':''}`}
+// 效果範圍：選取的器材、擺放中的預覽；只畫在同一區內
+let fxLayer=null;
+function drawItemFx(){if(!svg)return;if(!fxLayer||!fxLayer.isConnected)fxLayer=el('g',{'pointer-events':'none'},svg);fxLayer.innerHTML='';if(mode!=='layout')return;
+  const z=zones().find(q=>q.id===selected);if(!z)return;const list=[];
+  if(selItem&&selItem.z===z.id&&(z.items||[])[selItem.i])list.push({it:z.items[selItem.i],ghost:false});
+  if(itemMode&&itemHover){const I=ITEMS[itemMode],it={k:itemMode,x:itemHover.x,y:itemHover.y};if(it.x>=z.x&&it.y>=z.y&&it.x+I.w<=z.x+z.w&&it.y+I.h<=z.y+z.h)list.push({it,ghost:true})}
+  if(itemMode)(z.items||[]).filter(i=>i.k===itemMode).forEach(it=>list.push({it,ghost:false,dim:true}));
+  for(const {it,ghost,dim} of list){const I=ITEMS[it.k];
+    if(I.r){const W=map().W,cells=new Set();for(let y=z.y;y<z.y+z.h;y++)for(let x=z.x;x<z.x+z.w;x++)if(inRange(it,{x,y,w:1,h:1}))cells.add(y*W+x);
+      let d='';cells.forEach(i=>{const x=i%W,y=(i/W)|0;if(!cells.has(i-W))d+=`M${x} ${y}h1`;if(!cells.has(i+W))d+=`M${x} ${y+1}h1`;if(!cells.has(i-1)||x===0)d+=`M${x} ${y}v1`;if(!cells.has(i+1))d+=`M${x+1} ${y}v1`});
+      let f='';cells.forEach(i=>{const x=i%W,y=(i/W)|0;f+=`M${x} ${y}h1v1h-1z`});
+      el('path',{d:f,fill:I.color,'fill-opacity':dim?.08:.18,stroke:'none'},fxLayer);el('path',{d,class:'fxline',stroke:I.color,'stroke-opacity':dim?.5:1},fxLayer);
+      if(lastCheck)lastCheck.plan.filter(r=>r.bed&&zoneOfRect(r)===z&&inRange(it,r)).forEach(r=>el('rect',{x:r.x+.12,y:r.y+.12,width:r.w-.24,height:r.h-.24,rx:.2,fill:'none',stroke:I.color,'stroke-width':.16,'stroke-opacity':dim?.5:1},fxLayer))}
+    if(ghost)el('rect',{x:it.x+.06,y:it.y+.06,width:I.w-.12,height:I.h-.12,rx:.12,fill:I.color,'fill-opacity':.6,stroke:'#0b1d30','stroke-width':.08},fxLayer);
+    else if(!dim)el('rect',{x:it.x-.08,y:it.y-.08,width:I.w+.16,height:I.h+.16,rx:.2,fill:'none',stroke:'var(--hl)','stroke-width':.18},fxLayer)}}
 function itemCells(it){const I=ITEMS[it.k],c=[];for(let v=0;v<I.h;v++)for(let u=0;u<I.w;u++)c.push([it.x+u,it.y+v]);return c}
 function placeItem(z,k,cx,cy){const I=ITEMS[k],it={k,x:cx,y:cy};
   if(cx<z.x||cy<z.y||cx+I.w>z.x+z.w||cy+I.h>z.y+z.h){toast('要擺在這個區塊裡面');return}
   const used=new Set((z.items||[]).flatMap(i=>itemCells(i)).map(c=>c.join()));
   if(itemCells(it).some(c=>used.has(c.join()))){toast('這格已經有東西');return}
-  z.items=(z.items||[]).filter(i=>i.k!==k);z.items.push(it);itemMode=null;drawZones()}
-function nearItem(pl,k){const z=zoneOfRect(pl.r);if(!z||!z.items)return false;const it=z.items.find(i=>i.k===k);if(!it)return false;
-  const dx=Math.max(pl.r.x-it.x,it.x-(pl.r.x+pl.r.w),0),dy=Math.max(pl.r.y-it.y,it.y-(pl.r.y+pl.r.h),0);return (dx+dy)*CELL_M<=3}
+  (z.items=z.items||[]).push(it);selItem=null;drawZones()}   // 擺完不跳出，可以接著擺；點區塊外結束
+function nearItem(pl,k){const z=zoneOfRect(pl.r);if(!z||!z.items)return false;return z.items.some(it=>it.k===k&&inRange(it,pl.r))}
 
 // ===== 互動 =====
 let drag=null; const floating=document.createElement('div'); floating.className='floating'; floating.hidden=true; document.body.appendChild(floating);
@@ -937,6 +971,9 @@ $('#cards').addEventListener('pointerdown',ev=>{
 svg.addEventListener('pointerdown',ev=>{
   if(isEditing()){edDown(ev);return}
   if(mode==='sim'){drag={kind:'pan',sx:ev.clientX,sy:ev.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop,moved:false};return}
+  if(!itemMode&&selected!=null){const c=toCell(ev),z=zones().find(q=>q.id===selected),i=z&&c?(z.items||[]).findIndex(it=>itemCells(it).some(([x,y])=>x===c.cx&&y===c.cy)):-1;
+    if(i>=0){selItem={z:z.id,i};renderInfo();drawItemFx();ev.preventDefault();return}}
+  if(selItem){selItem=null;drawItemFx()}
   if(itemMode){const c=toCell(ev),z=zones().find(q=>q.id===selected);
     if(z&&c&&c.cx>=z.x&&c.cy>=z.y&&c.cx<z.x+z.w&&c.cy<z.y+z.h){placeItem(z,itemMode,c.cx,c.cy);ev.preventDefault();return}
     itemMode=null;renderInfo()}  // 點到區塊外就取消，不要把地圖鎖住
@@ -957,6 +994,7 @@ svg.addEventListener('pointerdown',ev=>{
   drag={kind:'pan',sx:ev.clientX,sy:ev.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop,moved:false};
 });
 window.addEventListener('pointermove',ev=>{
+  if(itemMode&&!drag&&mode==='layout'){const c=toCell(ev),h=c?{x:c.cx,y:c.cy}:null;if(JSON.stringify(h)!==JSON.stringify(itemHover)){itemHover=h;drawItemFx()}}
   if(!drag) return;
   if(drag.kind.startsWith('ed')){edMove(ev);return}
   if(drag.kind==='tent'||drag.kind==='tmove'){const c=toCell(ev);if(!c)return;
@@ -1060,7 +1098,9 @@ $('#info').addEventListener('click',ev=>{
   if(ev.target.id==='del'){state.layouts[LK(state.mapId)]=zones().filter(q=>q!==z);selected=null;drawZones();toast('已刪除');return}
   if(ev.target.id==='desel'){selected=null;drawZones();return}
   if(ev.target.id==='rot'){const r={x:z.x,y:z.y,w:z.h,h:z.w};if(canPlace(r,z.funcs,z.id)){z.w=r.w;z.h=r.h;drawJoined()}else toast('旋轉後放不下');return}
-  const ik=ev.target.dataset.item; if(ik){itemMode=itemMode===ik?null:ik;renderInfo();return}
+  const ik=ev.target.dataset.item; if(ik){itemMode=itemMode===ik?null:ik;selItem=null;itemHover=null;renderInfo();drawItemFx();return}
+  if(ev.target.id==='itemDel'&&selItem){z.items.splice(selItem.i,1);selItem=null;drawZones();return}
+  if(ev.target.id==='itemClr'){z.items=[];selItem=null;itemMode=null;drawZones();return}
   const rm=ev.target.dataset.rmf; if(rm){z.funcs=z.funcs.filter(f=>f!==rm);drawJoined()}
 });
 $('#info').addEventListener('change',ev=>{if(ev.target.id!=='tentDw')return;const tt=tents().find(t=>t.id===selTent);if(!tt)return;tt.dw=+ev.target.value;tentsChanged()});
@@ -1094,7 +1134,7 @@ window.addEventListener('keydown',ev=>{
   if((ev.key==='Delete'||ev.key==='Backspace')&&selTent&&!typing){const t=tents().find(q=>q.id===selTent);if(t)deleteTent(t);return}
   if((ev.key==='Delete'||ev.key==='Backspace')&&selTape&&!/input|textarea/i.test(document.activeElement.tagName)){state.tapes[LK(state.mapId)]=tapes().filter(t=>t.id!==selTape);selTape=null;drawZones();return}
   if((ev.key==='Delete'||ev.key==='Backspace')&&selected&&!/input|textarea/i.test(document.activeElement.tagName)){state.layouts[LK(state.mapId)]=zones().filter(q=>q.id!==selected);selected=null;drawZones()}
-  if(ev.key==='Escape'){selected=null;infoFunc=null;itemMode=null;selTent=null;tentMode=false;drawZones()}
+  if(ev.key==='Escape'){selected=null;infoFunc=null;itemMode=null;selItem=null;selTent=null;tentMode=false;drawZones()}
 });
 
 // ===== 模擬（Sprint 2：患者流動）=====
@@ -1107,11 +1147,12 @@ const P = {
   xray:{rate:.5,t:120,at:.6,isoClean:300}, // 有 X 光機的場地（焜哥 2026-11-17）：診療中約 5 成要照 X 光，一次 2 分；照到診療 4 成時離床去照；疑似傳染照完消毒 5 分（遊戲假設）
   jam:{shift:60,squeeze:120,temp:300,shiftAdd:60,slow:.5}, // 路被擋住（焜哥 2026-11-15）：1 分挪動擋路患者（被挪的多花 1 分）→ 2 分硬擠過患者旁（速度減半）→ 5 分就地設臨時醫療點
   per:{triage:2, pharm:2, morgue:1.25, borpTri:2, or:7, pacu:2},       // 這三區仍以坪數算位子；診療、留觀、隔離、候診改用患者佔地
-  t:{triage:60, triageRed:60, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600},
+  t:{triage:60, triageRed:60, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600, surgAssess:300},
   pharmSlow:2,                                // 藥師處置輕症的時間是護理師的 2 倍（焜哥 2026-11-18）
   orCases:3, orGoal:1, noSinkAdd:600, orLoad:2,          // BORP：3 名需手術者依序開刀、一次一台，4 小時到就結束（焜哥 2026-11-18）；指標仍以完成 1 台為目標；手術室沒有洗手台 +10 分；手術室冷氣 900–1200 W 佔 2 份插座量
   crampedMul:1.8, yObsRate:.5, deteriorate:.1, gWorsen:.1,
-  obsCheck:120, needDur:{toilet:180,food:300,water:60}, overdue:1800, // 留觀護理評估 2 分；生理需求拖超過 30 分就離崗
+  obsCheck:120, postAmb:[900,2700], // 術後在留觀等救護車 15–45 分隨機（焜哥 2026-11-18，數字為遊戲假設）
+   needDur:{toilet:180,food:300,water:60}, overdue:1800, // 留觀護理評估 2 分；生理需求拖超過 30 分就離崗
   stock:{med:6,mat:8,crit:2}, use:{g:{mat:1},y:{med:1,mat:1},r:{med:1,mat:1,crit:1},obs:{mat:1}}, lowRatio:.34,
   directM:2, cordMax:30, cords:5, outletLoad:2, genLoad:4, darkMul:1.3, cordWalk:.85, cordStr:.6, // 電力：插座 2 m 內直接插；延長線最多 5 條、每條 30 m、每插座 2 區
   loadTime:30, improvise:180, bagLimit:3, triHelp:300,     // 檢傷護理師協助重症最多 5 分鐘；庫房取物 30 秒；沒補給時 3 分鐘後臨時變通；每區 3 袋廢棄物就清運
@@ -1141,7 +1182,7 @@ const PARAM_TEXT = [
   '電力：每區接最近插座，2 m 內直接插，否則拉延長線（最多 5 條、每條 30 m、每個插座接 2 區）；沒電的區處置時間 ×1.3（照明與設備不足）；延長線經過處擔架速度 ×0.6、步行 ×0.85；插座不夠或太遠時改接發電機（每台供 4 區，一樣要拉延長線）',
   '帳篷：方形或圓形（正圓、橢圓），大小自由、數量不限；外圍 0.5 m 是帳篷布與營釘，不能擺東西也不能走；門寬可設 0.5 m 起，預設 1 m，開在每邊中間',
   '各區起始物資：藥品 6、衛材 8、重症設備 2；低於三分之一補貨；斷貨時 3 分鐘後臨時變通',
-  'BORP 關：MCI 的 4 名重症中，先到的 3 名需要損傷控制手術，一次開一台、依序開刀；4 小時到就結束，第 2 台可能開到一半。開刀流程：檢傷 → BORP 檢傷分類區術前評估 10 分 → 手術 80 分 → 術後恢復 10 分 → 救護車後送；沒擺 BORP 檢傷分類區就直接進手術室，沒擺術後恢復區就到留觀區，都沒有就在手術台上恢復',
+  'BORP 關：MCI 的 4 名重症中，先到的 3 名需要損傷控制手術，一次開一台、依序開刀；4 小時到就結束，第 2 台可能開到一半。開刀流程：檢傷 → 重傷區醫師判斷要開刀 5 分 → BORP 檢傷分類區術前評估 10 分 → 手術 80 分 → 術後恢復 10 分 → 留觀區等救護車（進留觀後 15–45 分隨機到）→ 後送；沒擺 BORP 檢傷分類區就直接進手術室，沒擺術後恢復區就直接進留觀區，沒擺留觀區就在術後恢復區等救護車',
   'BORP 關：手術組（外科、骨科、麻醉）3 人全程；術前評估需急診醫師＋急診護理師；術後恢復需 1 名護理師全程。手術室每 7 坪 1 張手術台，BORP 檢傷分類區、術後恢復區每 2 坪 1 床',
   'BORP 關：BORP 9 人一開始就在站內（附件二十四）；空閒時可支援一般區（外、骨、麻當醫師用，衛勤抬擔架、做後勤），BORP 有病人時叫回來，原本的患者改等其他人',
   'BORP 關：手術室是無菌區，患者與擔架不能穿過，也不能和其他功能合併',
@@ -1263,7 +1304,7 @@ const BED_F=['major','mid','obs','iso'], GRID_F=[...SPACE_F,'public'];
 function gridBands(S,d,gap,lead,head){const t=[];let p=lead?gap:0,pair=0;
   while(p+d<=S){t.push(p);p+=d+(pair++%2?(head?1:0):gap)}return t}
 function gridRects(z,bed,horiz,gap,lead,end,head){
-  const L=horiz?z.w:z.h,S=horiz?z.h:z.w,d=bed?2*CM:CM,bands=gridBands(S,d,gap,lead,head).slice(0,!bed&&Math.min(z.w,z.h)<6?1:99),out=[];if(!bands.length)return out;
+  const L=horiz?z.w:z.h,S=horiz?z.h:z.w,d=bed?2*CM:CM,bands=gridBands(S,d,gap,lead,head),out=[];if(!bands.length)return out;
   const off=end?S-bands[bands.length-1]-d:0,along=[];
   // 重傷區的床兩側都留 0.5 m（區塊邊緣也留）；其他區床與床之間都隔 0.5 m、靠區塊邊緣的那床可以只有一側（焜哥 2026-11-18）；座位不分組，整排排滿
   const both=bed&&z.funcs.includes('major'),tail=both?1:0;
@@ -1274,19 +1315,41 @@ function gridRects(z,bed,horiz,gap,lead,end,head){
 function rectFree(r,ok){for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(!ok(x,y))return false;return true}
 const stepsIn=r=>{const v=sim.d0[r.y*map().W+r.x];return v<0?1e6:v};
 // 試擺一種排法：近入口的先放，會擋住出入口、定點或前面床位的就不放
-function gridTry(rects,needStr){const W=map().W,kept=[],w=sim.rw,s=sim.rs,near=(r,arr)=>around(r).some(([x,y])=>arr[y*W+x]);let score=0;
+function gridTry(rects,needStr,strict){const W=map().W,kept=[],w=sim.rw,s=sim.rs,near=(r,arr)=>around(r).some(([x,y])=>arr[y*W+x]);let score=0;
   const m=map(),floor=(x,y)=>m.g[y][x]==='F'&&!sim.fp[y*W+x]&&!sim.slotCell[y*W+x];
   rects=rects.filter(r=>rectFree(r,floor)).sort((p,q)=>stepsIn(p)-stepsIn(q));
   for(const r of rects){markFp(r,1);computeWide();reach(false,w);reach(true,s);
-    const ok=near(r,w)&&kept.every(o=>near(o,w))&&sim.exits.every(([x,y])=>w[y*W+x])&&sim.anchors.every(i=>s[i])&&sim.gates.every(l=>l.some(i=>s[i]));
+    const ok=near(r,w)&&kept.every(o=>near(o,w))&&(!strict||near(r,s)&&kept.every(o=>near(o,s)))&&sim.exits.every(([x,y])=>w[y*W+x])&&sim.anchors.every(i=>s[i])&&sim.gates.every(l=>l.some(i=>s[i]));
     if(ok)kept.push(r);else markFp(r,0)}
   kept.forEach(r=>{score+=needStr&&near(r,s)?2:1;markFp(r,0)});computeWide();return {kept,score}}
+// 床位混著擺（焜哥 2026-11-18）：直放、橫放都試，找出區內最多床的排法；規則同 gridRects——床頭外 0.5 m（可共用），
+// 重傷區兩個長邊都留 0.5 m，其他區床與床之間隔 0.5 m（靠區塊邊緣那側可以沒有）。這裡只看區內的格子，擔架到不到得了交給 gridTry 檢查
+function packRects(z,major){const m=map(),W=m.W,D=2*CM,inZ=(x,y)=>x>=z.x&&y>=z.y&&x<z.x+z.w&&y<z.y+z.h,
+  floor=(x,y)=>m.g[y][x]==='F'&&!sim.fp[y*W+x]&&!sim.slotCell[y*W+x],C=[];
+  for(const [w,h] of [[CM,D],[D,CM]])for(let y=z.y;y+h<=z.y+z.h;y++)for(let x=z.x;x+w<=z.x+z.w;x++){const r={x,y,w,h};if(!rectFree(r,floor))continue;
+    const vert=h>w,line=(f,n)=>[...Array(n).keys()].map(f),
+      sides=vert?[line(i=>[x-1,y+i],h),line(i=>[x+w,y+i],h)]:[line(i=>[x+i,y-1],w),line(i=>[x+i,y+h],w)],
+      ends=(vert?[line(i=>[x+i,y-1],w),line(i=>[x+i,y+h],w)]:[line(i=>[x-1,y+i],h),line(i=>[x+w,y+i],h)]).filter(e=>e.every(([u,v])=>inZ(u,v)&&floor(u,v)));
+    const sIn=sides.filter(e=>e.every(([u,v])=>inZ(u,v)&&floor(u,v))),sAny=sides.map(e=>e.filter(([u,v])=>inZ(u,v)));
+    if(!ends.length||(major?sIn.length<2:!sIn.length))continue;
+    const cells=[];for(let v=y;v<y+h;v++)for(let u=x;u<x+w;u++)cells.push(v*W+u);
+    C.push({r,cells,side:sAny.flat().map(([u,v])=>v*W+u),ends:ends.map(e=>e.map(([u,v])=>v*W+u)),d:stepsIn(r)})}
+  C.sort((p,q)=>p.d-q.d);
+  const occ=new Uint8Array(m.W*m.H),sel=[];let best=[],sols=[],nodes=0,used=0;const area=z.w*z.h,hit=a=>a.some(k=>occ[k]);
+  const ok=c=>{if(hit(c.side))return false;c.cells.forEach(k=>occ[k]=1);
+    const r=c.ends.some(e=>!hit(e))&&sel.every(o=>!hit(o.side)&&o.ends.some(e=>!hit(e)));c.cells.forEach(k=>occ[k]=0);return r};
+  const dfs=i=>{if(++nodes>20000)return;if(sel.length>best.length){best=sel.slice();sols=[best]}else if(sel.length&&sel.length===best.length&&sols.length<12)sols.push(sel.slice());
+    if(sel.length+Math.floor((area-used)/(D*CM))<best.length)return;
+    for(let j=i;j<C.length;j++){const c=C[j];if(hit(c.cells)||!ok(c))continue;
+      sel.push(c);c.cells.forEach(k=>occ[k]=1);used+=c.cells.length;dfs(j+1);sel.pop();c.cells.forEach(k=>occ[k]=0);used-=c.cells.length;if(nodes>20000)return}};
+  dfs(0);return sols.map(b=>b.map((c,i)=>({...c.r,band:i})))}   // 同樣床數的幾種排法都交給 gridTry 挑擔架推得到的
 function gridBest(z,bed,needStr){let best=null;
-  const narrow=!bed&&Math.min(z.w,z.h)<6;   // 窄走廊的座位只排一列，貼牆順著走，留出擔架通道
+  // 座位能排幾排就排幾排（焜哥 2026-11-18 取消「窄區只排一列」）；擋住出入口、擔架路線的座位由 gridTry 剔除
   const head=bed;
   for(const horiz of [true,false])for(const gap of [2,1])for(const lead of [false,true])for(const end of [false,true]){
-    if(narrow&&(horiz!==(z.w>=z.h)||lead))continue;
     const t=gridTry(gridRects(z,bed,horiz,gap,lead,end,head),needStr);if(!best||t.score>best.score)best=t}
+  if(bed&&z.w*z.h<=200)for(const rs of packRects(z,z.funcs.includes('major'))){if(rs.length<=best.kept.length)break;   // 混著擺：床沒比較多就不用試；每張床都要推得到擔架才算
+    const t=gridTry(rs,needStr,needStr);if(t.kept.length>best.kept.length)best=t;if(t.kept.length===rs.length)break}
   return best}
 function buildPlan(){const W=map().W,zs=zones().filter(z=>z.funcs.some(f=>GRID_F.includes(f))),rank=z=>Math.min(...z.funcs.map(f=>GRID_F.includes(f)?GRID_F.indexOf(f):9));
   zs.sort((p,q)=>rank(p)-rank(q));
@@ -1309,10 +1372,12 @@ function drawPlan(){(sim.borpBeds||[]).forEach(r=>{el('rect',{x:r.x+.06,y:r.y+.0
 // 重症床長邊外側的 0.5 m 走道，已有走道的那側優先（兩床共用）
 function bedStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,sides=w>h?[[...Array(w).keys()].map(i=>[x+i,y-1]),[...Array(w).keys()].map(i=>[x+i,y+h])]:[[...Array(h).keys()].map(i=>[x-1,y+i]),[...Array(h).keys()].map(i=>[x+w,y+i])];
   const ok=sides.filter(st=>st.every(([u,v])=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u]));
-  return ok.find(st=>st.some(([u,v])=>sim.aisle[v*W+u]))||ok[0]}
+  const clear=ok.filter(st=>!st.some(([u,v])=>sim.planCell[v*W+u]));
+  return clear.find(st=>st.some(([u,v])=>sim.aisle[v*W+u]))||clear[0]||ok.find(st=>st.some(([u,v])=>sim.aisle[v*W+u]))||ok[0]}
 // 重傷區躺床：床頭（短邊）外留 0.5 m，不和別床共用（焜哥 2026-11-14：頭端至少 0.5 m，臨床慣例）
 function headStrip(r){const m=map(),W=m.W,{x,y,w,h}=r,ends=h>w?[[...Array(w).keys()].map(i=>[x+i,y-1]),[...Array(w).keys()].map(i=>[x+i,y+h])]:[[...Array(h).keys()].map(i=>[x-1,y+i]),[...Array(h).keys()].map(i=>[x+w,y+i])];
-  return ends.find(st=>st.every(([u,v])=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u]))}
+  const ok=ends.filter(st=>st.every(([u,v])=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u]));
+  return ok.find(st=>!st.some(([u,v])=>sim.planCell[v*W+u]))||ok[0]}   // 床頭優先朝沒排床的那端，免得占到別張床（混著擺時）
 // 躺床長邊外要有 0.5 m 站得了人（可與隔壁床共用）：重傷區兩側都要，其他區至少一側（焜哥 2026-11-18）
 function sidesOK(r,both){const m=map(),W=m.W,{x,y,w,h}=r,ok=(u,v)=>v>=0&&u>=0&&v<m.H&&u<W&&WALKABLE.has(m.g[v][u])&&!sim.fp[v*W+u];
   const n=w>h?w:h,a=[...Array(n).keys()].every(i=>w>h?ok(x+i,y-1):ok(x-1,y+i)),b=[...Array(n).keys()].every(i=>w>h?ok(x+i,y+h):ok(x+w,y+i));
@@ -1568,10 +1633,10 @@ function spawn(s){
 function svcTime(a,f,slot){
   let t=0;
   if(f==='triage') t=a.cat==='r'?P.t.triageRed:P.t.triage;
-  else if(isTreat(f)) t=P.t.treat[a.cat]||P.t.treat.y;
+  else if(isTreat(f)) t=a.preSurg?P.t.surgAssess:P.t.treat[a.cat]||P.t.treat.y;
   else if(f==='iso') t=P.t.iso;
   else if(f==='pharm') t=P.t.pharm;
-  else if(f==='obs') t=a.postop?P.t.pacu:a.cat==='r'?P.t.obsR:P.t.obsY;
+  else if(f==='obs') t=a.postop?(a.pacuDone?0:P.t.pacu)+ambWait():a.cat==='r'?P.t.obsR:P.t.obsY;
   else if(BORP_F.includes(f)) t=P.t[f];
   if(f==='or'&&slot){const z=zones().find(q=>q.id===slot.zone);if(z&&!orSink(z))t+=P.noSinkAdd}
   let k=slot&&slot.cramped?P.crampedMul:1;
@@ -1649,7 +1714,7 @@ function arrived(a){
   if(k==='slot'){const f=a.slot.f; a.svc=f; a.moving=false; if(a.slot.s.rect) settle(a,a.slot.s);
     if(f==='morgue'){a.stage='body';return}
     a.timer=svcTime(a,f,a.slot.s); a.crew=[]; a.coming=0; a.await=crewFor(a,f); a.ss=sim.t; a.useF=f; a.stocked=false;
-    a.crewUntil=f==='obs'&&!a.postop?Math.max(0,a.timer-P.obsCheck):null; if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0};
+    a.crewUntil=f==='obs'?Math.max(0,a.timer-(a.postop&&!a.pacuDone?P.t.pacu:P.obsCheck)):null; if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0};
     if(sim.xr&&!a.xrHad&&(isTreat(f)||f==='iso')){a.xrHad=true;if(sim.xrRnd()<P.xray.rate)a.xrAt=a.timer*P.xray.at} return}
   if(k==='xray'){a.svc='xray';a.xrQ=sim.t;return}
   if(k==='xrback'){backToBed(a);return}
@@ -1667,6 +1732,9 @@ function done(a){
   if(f==='xray'){sim.xrUser=null;sim.xrFree=sim.t+(a.cat==='i'||a.exposure?P.xray.isoClean:0);sim.stats.xrDone++;a.svc='xray';setGoal(a,bedCells(a),'xrback');return}
   if(f==='triage'){a.triaged=true; sim.stats.triaged++; rel(a); route(a); return}
   if(isTreat(f)){if(a.worsen){worsen(a);return}
+    if(a.preSurg){a.preSurg=false; // 重傷區醫師判斷要開刀（5 分）→ BORP；手術台排不到的照一般重症穩定後後送
+      if(sim.orUsed<P.orCases){sim.orUsed++;want(a,has('borpTri')?'borpTri':'or');return}
+      a.surgOut=true;sim.stats.surgOut++}
     sim.stats.treated++; addBag(f);
     if(a.cat==='r'||(a.cat==='y'&&a.obsPlan)) {toObs(a);return}
     toPharmOrExit(a); return}
@@ -1675,11 +1743,11 @@ function done(a){
     if(a.cat==='r'||sim.rnd()<P.deteriorate*(a.slot&&a.slot.s.rect&&nearItem(a.slot.s,'monitor')?.5:1)){if(a.cat!=='r'){a.cat='r';sim.stats.deteriorated++} transfer(a); return}
     toPharmOrExit(a); return}
   if(f==='pharm'){exit(a);return}
-  // BORP：術前評估完佔著床等手術台 → 手術 80 分 → 術後恢復 10 分 → 後送
+  // BORP：重傷區判斷 5 分 → 術前評估完佔著床等手術台 → 手術 80 分 → 術後恢復 10 分 → 留觀等救護車 → 後送
   if(f==='borpTri'){want(a,'or');return}
   if(f==='or'){sim.stats.treated++;sim.stats.surgDone++;a.postop=true;
-    if(has('pacu'))want(a,'pacu');else if(has('obs'))want(a,'obs');else{a.svc='hold';a.timer=P.t.pacu}return}
-  if(f==='pacu'){transfer(a);return}
+    if(has('pacu'))want(a,'pacu');else if(has('obs'))want(a,'obs');else{a.svc='hold';a.timer=P.t.pacu+ambWait()}return}
+  if(f==='pacu'){a.pacuDone=true;if(has('obs'))want(a,'obs');else{a.svc='hold';a.timer=ambWait()}return}  // 術後恢復 → 留觀等救護車；沒留觀區就在恢復區等
   if(f==='hold'){ // 沒有留觀區時在診療床上留觀
     if(a.cat==='r'){transfer(a);return} toPharmOrExit(a); return}
 }
@@ -1693,6 +1761,8 @@ function worsen(a){a.worsen=false;a.cat='r';a.lying=true;a.str=true;a.moving=tru
 function route(a){
   if(a.cat==='b'){ if(has('morgue')) want(a,'morgue'); else {a.stage='body'; if(a.slot){const s=a.slot;a.slot=null;freeSlot(s)} goWait(a,'triage')} return}
   // 需手術者都送 BORP，依序開刀（P.orCases）；超過的照一般重症流程穩定後後送
+  // 需手術者先進重傷區由醫師判斷（5 分），判斷完才送 BORP（焜哥 2026-11-18）；沒有任何診療區就直接送
+  if(a.surg&&has('or')&&TREAT_F.some(has)){a.preSurg=true;wantTreat(a);return}
   if(a.surg&&has('or')&&sim.orUsed<P.orCases){sim.orUsed++;want(a,has('borpTri')?'borpTri':'or');return}
   if(a.surg){a.surgOut=true;sim.stats.surgOut++}
   if(a.cat==='i'&&has('iso')){want(a,'iso');return}
@@ -1701,6 +1771,7 @@ function route(a){
   if(TREAT_F.some(has)) wantTreat(a);
   else {a.stage='untreated'; if(a.slot){const s=a.slot;a.slot=null;freeSlot(s)} goWait(a,'triage'); sim.stats.noTreat++}
 }
+const ambWait=()=>P.postAmb[0]+sim.rnd()*(P.postAmb[1]-P.postAmb[0]);
 function toObs(a){
   if(has('obs')) want(a,'obs');
   else {a.svc='hold'; a.timer=a.cat==='r'?P.t.obsR:P.t.obsY}   // 佔著診療床留觀
@@ -1808,7 +1879,7 @@ function tempSite(a){const k=a.goalKind;a.goal=null;a.goalKind=null;a.noWay=0;a.
   if(fpLayer)a.tempNode=el('rect',{x:a.cx-.5,y:a.cy-.5,width:2,height:2,rx:.3,class:'fp-temp'},fpLayer);
   a.svc=f;if(f==='morgue'){a.stage='body';return}
   a.timer=svcTime(a,f,null);a.crew=[];a.coming=0;a.await=crewFor(a,f);a.ss=sim.t;a.useF=f;a.stocked=false;
-  a.crewUntil=f==='obs'&&!a.postop?Math.max(0,a.timer-P.obsCheck):null;if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0}}
+  a.crewUntil=f==='obs'?Math.max(0,a.timer-(a.postop&&!a.pacuDone?P.t.pacu:P.obsCheck)):null;if(f==='or'){sim.stats.surgStart++;sim.stats.orAt=sim.t-a.t0}}
 
 function tick(dt){
   while(sim.sched.length&&sim.sched[0].t<=sim.t) spawn(sim.sched.shift());
@@ -1977,10 +2048,10 @@ function layoutCheck(){const keep=sim,out={items:[],cap:[],plan:[],borp:[]};
     [['iso','public','隔離區緊貼公共空間','指引 p.14：隔離區要獨立、動線不經公共空間'],['waste','public','廢棄物區緊貼公共空間','指引 p.15：廢棄物與公共空間、生活區隔離'],['waste','rest','廢棄物區緊貼人員休息區','指引 p.15：廢棄物與公共空間、生活區隔離'],['morgue','public','遺體區緊貼公共空間','指引 p.16：遺體與公共空間、生活區隔離'],['or','morgue','手術室緊貼遺體區','指引 p.24：BORP 選址']]
       .forEach(([f,g,text,ref])=>{const a=zones().find(p=>p.funcs.includes(f)&&zones().some(q=>q!==p&&q.funcs.includes(g)&&near(p,q)));if(a)add('warn',text,a,ref)});
     const ad=zones().find(z=>z.funcs.includes('admin')&&z.funcs.some(f=>isTreat(f)||f==='obs'));if(ad)add('warn','行政區和醫療區合併',ad,'指引 p.16：行政（指揮中心）與醫療區分開');
-    out.plan=sim.plan.map(r=>({x:r.x,y:r.y,w:r.w,h:r.h}));out.borp=(sim.borpBeds||[]).slice();
+    out.plan=sim.plan.map(r=>({x:r.x,y:r.y,w:r.w,h:r.h,bed:r.bed}));out.borp=(sim.borpBeds||[]).slice();
   }catch(e){console.error(e)}finally{sim=keep}
   out.items.sort((p,q)=>(p.lvl==='bad'?0:1)-(q.lvl==='bad'?0:1));return out}
-function drawCheck(){if(!alertLayer||!fpLayer)return;alertLayer.innerHTML='';fpLayer.innerHTML='';if(!lastCheck||mode!=='layout')return;
+function drawCheck(){if(!alertLayer||!fpLayer)return;alertLayer.innerHTML='';fpLayer.innerHTML='';drawItemFx();if(!lastCheck||mode!=='layout')return;
   lastCheck.borp.concat(lastCheck.plan).forEach(r=>el('rect',{x:r.x+.06,y:r.y+.06,width:r.w-.12,height:r.h-.12,rx:.2,class:r.f==='or'?'plan ortable':'plan'},fpLayer));
   const by=new Map();lastCheck.items.forEach(it=>{if(it.z==null)return;by.set(it.z,(by.get(it.z)||false)||it.lvl==='bad')});
   by.forEach((bad,id)=>{const z=zones().find(q=>q.id===id);if(!z)return;const col=bad?'var(--bad)':'var(--hl)',x=z.x+z.w-.6,y=z.y+.6;
@@ -2029,7 +2100,7 @@ function startSim(){
   sim.toilets=[];for(let y=1;y<m.H-1;y++)for(let x=1;x<m.W-1;x++)if('FGR'.includes(m.g[y][x])&&[[1,0],[-1,0],[0,1],[0,-1]].some(([u,v])=>m.g[y+v][x+u]==='T'))sim.toilets.push([x,y]);
   sim.staffStart=m.staffStart||autoStaffStart(m);
   sim.evKey=evPick();sim.evFired=false;sim.evMsg='';sim.extra=0;sim.outUntil=0;sim.noAmb=false;sim.storeLost=false;
-  sim.jobs=[];sim.pend={};sim.stock={};['major','mid','minor','obs'].forEach(f=>{const z=firstZone(f),more=z&&(z.items||[]).some(i=>i.k==='cabinet');sim.stock[f]=Object.fromEntries(Object.keys(P.stock).map(k=>[k,Math.ceil(P.stock[k]*(more?1.5:1))]))});sim.bags={major:0,mid:0,minor:0,obs:0,iso:0};
+  sim.jobs=[];sim.pend={};sim.stock={};['major','mid','minor','obs'].forEach(f=>{const z=firstZone(f),nc=z?(z.items||[]).filter(i=>i.k==='cabinet').length:0;sim.stock[f]=Object.fromEntries(Object.keys(P.stock).map(k=>[k,Math.ceil(P.stock[k]*(1+.5*nc))]))});sim.bags={major:0,mid:0,minor:0,obs:0,iso:0};
   agentLayer.innerHTML=''; alertLayer.innerHTML=''; heatLayer.innerHTML=''; fpLayer.innerHTML=''; drawPlan();
   sim.total=sim.sched.length;
   sim.zbit=new Uint8Array(N);zones().forEach(z=>{const b=(z.funcs.includes('public')?1:0)|(z.funcs.some(isTreat)?2:0);if(b)zoneCells(z).forEach(([x,y])=>sim.zbit[y*W+x]|=b)});
