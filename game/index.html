@@ -1560,7 +1560,7 @@ function spawn(s){
   const m=map(); let start=m.arrive;
   const amb=zones().find(z=>z.funcs.includes('amb'));
   if(s.str&&amb) start=[amb.x+Math.floor(amb.w/2),amb.y+Math.floor(amb.h/2)];
-  const a={id:sim.nextId++,cat:s.cat,str:s.str,lying:s.lying,mci:!!s.mci,worsen:!!s.worsen,surg:!!s.surg&&sim.borp,x:start[0],y:start[1],cx:start[0],cy:start[1],triaged:false,
+  const a={id:sim.nextId++,cat:s.cat,str:s.str,lying:s.lying,mci:!!s.mci,ev:!!s.ev,worsen:!!s.worsen,surg:!!s.surg&&sim.borp,x:start[0],y:start[1],cx:start[0],cy:start[1],triaged:false,
     goal:null,goalKind:null,timer:0,svc:null,slot:null,spot:null,waitFor:null,waitSince:null,waitTotal:0,blocked:0,stuck:false,gone:false,next:null};
   a.t0=sim.t;sim.agents.push(a); sim.occ[a.cy*m.W+a.cx]+=a.str?2:1; sim.stats.arrived++;
   if(has('triage')) want(a,'triage'); else {a.triaged=true; route(a)}
@@ -2073,9 +2073,17 @@ function tieAt(s,sec,to){const W=map().W,t=to.filter(([x,y])=>sim.walk[y*W+x]&&!
 const stockSum=k=>Object.values(sim.stock).reduce((n,st)=>n+(k?st[k]:Object.values(st).reduce((a,b)=>a+b,0)),0);
 function evMark(o){(sim.evMarks=sim.evMarks||[]).push(o)}
 const anyPorter=()=>sim.staff.find(x=>PORTERS.includes(x.role)&&x.state==='idle')||sim.staff.find(x=>PORTERS.includes(x.role)&&!x.follow&&x.task&&x.task.k==='post');
-const addP=(list)=>{list.forEach(([cat,str],i)=>sim.sched.push({t:sim.t+1+i*30,cat,str:!!str,mci:true,worsen:cat==='g'&&sim.rnd()<P.gWorsen,lying:cat==='r'||cat==='i'||(cat==='y'&&(!!str||i%2===0))}));sim.sched.sort((a,b)=>a.t-b.t);sim.extra+=list.length};
+const addP=(list,gap=30,ev=false)=>{list.forEach(([cat,str],i)=>sim.sched.push({t:sim.t+1+Math.round(i*gap),cat,str:!!str,mci:true,ev,worsen:cat==='g'&&sim.rnd()<P.gWorsen,lying:cat==='r'||cat==='i'||(cat==='y'&&(!!str||i%2===0))}));sim.sched.sort((a,b)=>a.t-b.t);sim.extra+=list.length};
 const EVENTS={
   surge:{name:'突然湧入 8 名外傷',ref:'指引 p.12：公共空間轉檢傷擴充',run(){addP([['r',1],['y',1],['y',0],['y',0],['g',0],['g',0],['g',0],['g',0]]);return '8 名外傷同時抵達'}},
+  mass:{name:'大量傷患：額外 15 名',ref:'指引 p.12：公共空間轉檢傷擴充；遊戲假設：紅 3、黃 4、綠 8',run(){
+    const l=[['r',1],['r',1],['r',1],['y',1],['y',1],['y',0],['y',0],...Array(8).fill(['g',0])];shuffle(l,sim.rnd);addP(l,40,true);
+    const [x,y]=map().arrive;evMark({x,y,text:'大量傷患湧入',col:'var(--bad)',until:sim.t+900});
+    sim.evLoss=()=>{const ps=sim.agents.filter(a=>a.ev),out=ps.filter(a=>a.gone).length,arr=ps.length,
+      w=ps.map(a=>a.waitTotal+(!a.gone?(a.waitSince!=null?sim.t-a.waitSince:0)+(a.ss!=null?sim.t-a.ss:0)+(a.cs!=null?sim.t-a.cs:0):0)),mx=Math.round(Math.max(0,...w)/60),
+      inR=ps.filter(a=>!a.gone&&a.cat==='r').length;
+      return `15 人中已到 ${arr} 人，處置完離站 ${out} 人，還在站內 ${arr-out} 人（其中紅色 ${inR} 人）；這批人等最久 ${mx} 分。`};
+    return '15 名傷患（紅 3、黃 4、綠 8）在 10 分鐘內陸續抵達'}},
   infect:{name:'疑似傳染病患 2 名',ref:'指引 p.14：隔離動線與穿脫防護裝備',run(){addP([['i',0],['i',0]]);return '2 名疑似傳染患者進站'}},
   outage:{name:'停電 30 分鐘',ref:'指引附件五',run(){sim.outUntil=sim.t+1800;return firstZone('gen')?'發電機接手，處置不受影響':'沒有發電機，30 分鐘內處置時間 ×1.5'}},
   noamb:{name:'救護車 2 小時到不了',ref:'指引 p.13：留觀區延長照護',run(){sim.noAmb=true;return '重症無法轉出，留觀床被長期占用'}},
