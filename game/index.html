@@ -1336,13 +1336,28 @@ function packRects(z,major){const m=map(),W=m.W,D=2*CM,inZ=(x,y)=>x>=z.x&&y>=z.y
     C.push({r,cells,side:sAny.flat().map(([u,v])=>v*W+u),ends:ends.map(e=>e.map(([u,v])=>v*W+u)),d:stepsIn(r)})}
   C.sort((p,q)=>p.d-q.d);
   const occ=new Uint8Array(m.W*m.H),sel=[];let best=[],sols=[],nodes=0,used=0;const area=z.w*z.h,hit=a=>a.some(k=>occ[k]);
+  // 擔架通道：床邊要接得到 1 m 寬（2×2 空格）的路，路要從區外擔架到得了的地方接進來；床越加路只會越少，所以不通就剪枝（焜哥 2026-11-18：衛生所診間 A 只有下方一個門）
+  const s0=new Uint8Array(W*m.H);computeWide();reach(true,s0);
+  const x0=Math.max(0,z.x-1),y0=Math.max(0,z.y-1),x1=Math.min(W-1,z.x+z.w),y1=Math.min(m.H-1,z.y+z.h),
+    base=i=>sim.walk[i]&&!sim.fp[i]&&!sim.tape[i]&&!occ[i],wd=new Uint8Array(W*m.H),seen=new Uint8Array(W*m.H),q=[];
+  const access=()=>{if(!sel.length)return true;
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)wd[y*W+x]=0;
+    for(let y=Math.max(0,y0-1);y<=y1;y++)for(let x=Math.max(0,x0-1);x<=x1;x++){const i=y*W+x;if(x+1<W&&y+1<m.H&&base(i)&&base(i+1)&&base(i+W)&&base(i+W+1)){wd[i]=1;wd[i+1]=1;wd[i+W]=1;wd[i+W+1]=1}}
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)seen[y*W+x]=0;q.length=0;
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*W+x;if(!inZ(x,y)&&s0[i]&&wd[i]){seen[i]=1;q.push(i)}}
+    for(let h=0;h<q.length;h++){const i=q[h],x=i%W,y=(i/W)|0;for(const [u,v] of [[x-1,y],[x+1,y],[x,y-1],[x,y+1]]){if(u<x0||u>x1||v<y0||v>y1)continue;const j=v*W+u;if(!seen[j]&&wd[j]){seen[j]=1;q.push(j)}}}
+    return sel.every(c=>around(c.r).some(([u,v])=>u>=x0&&u<=x1&&v>=y0&&v<=y1&&seen[v*W+u]))};
+  // 同一區、周圍格子沒變就沿用上次算好的排法（佈置時每改一下就會重算整站）
+  let sig=`${m.id}|${z.x},${z.y},${z.w},${z.h}|${major?1:0}|`;for(let y=Math.max(0,y0-1);y<=Math.min(m.H-1,y1+1);y++)for(let x=Math.max(0,x0-1);x<=Math.min(W-1,x1+1);x++){const i=y*W+x;sig+=(base(i)?1:0)+(s0[i]?2:0)+(sim.slotCell[i]?4:0)}
+  if(PACK_CACHE.has(sig))return PACK_CACHE.get(sig);
   const ok=c=>{if(hit(c.side))return false;c.cells.forEach(k=>occ[k]=1);
     const r=c.ends.some(e=>!hit(e))&&sel.every(o=>!hit(o.side)&&o.ends.some(e=>!hit(e)));c.cells.forEach(k=>occ[k]=0);return r};
-  const dfs=i=>{if(++nodes>20000)return;if(sel.length>best.length){best=sel.slice();sols=[best]}else if(sel.length&&sel.length===best.length&&sols.length<12)sols.push(sel.slice());
+  const dfs=i=>{if(++nodes>8000)return;if(sel.length>best.length){best=sel.slice();sols=[best]}else if(sel.length&&sel.length===best.length&&sols.length<12)sols.push(sel.slice());
     if(sel.length+Math.floor((area-used)/(D*CM))<best.length)return;
     for(let j=i;j<C.length;j++){const c=C[j];if(hit(c.cells)||!ok(c))continue;
-      sel.push(c);c.cells.forEach(k=>occ[k]=1);used+=c.cells.length;dfs(j+1);sel.pop();c.cells.forEach(k=>occ[k]=0);used-=c.cells.length;if(nodes>20000)return}};
-  dfs(0);return sols.map(b=>b.map((c,i)=>({...c.r,band:i})))}   // 同樣床數的幾種排法都交給 gridTry 挑擔架推得到的
+      sel.push(c);c.cells.forEach(k=>occ[k]=1);used+=c.cells.length;if(access())dfs(j+1);sel.pop();c.cells.forEach(k=>occ[k]=0);used-=c.cells.length;if(nodes>8000)return}};
+  dfs(0);const res=sols.map(b=>b.map((c,i)=>({...c.r,band:i})));if(PACK_CACHE.size>300)PACK_CACHE.clear();PACK_CACHE.set(sig,res);return res}
+const PACK_CACHE=new Map();   // 同樣床數的幾種排法都交給 gridTry 挑擔架推得到的
 function gridBest(z,bed,needStr){let best=null;
   // 座位能排幾排就排幾排（焜哥 2026-11-18 取消「窄區只排一列」）；擋住出入口、擔架路線的座位由 gridTry 剔除
   const head=bed;
