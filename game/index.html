@@ -1,4 +1,8 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>急救站佈局挑戰</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23138f82%22/%3E%3Cpath d=%22M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z%22 fill=%22%23fff%22/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -188,6 +192,9 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .params ul{padding-left:1.1em;margin:6px 0}
   .evpick{font-size:13px;color:var(--chalk-dim)}.evpick select{font:inherit;color:var(--chalk);background:var(--panel);border:1px solid var(--panel-line);border-radius:6px;padding:4px}
 .simming .evpick,.simming #tutBtn{display:none}
+.evhint{margin-left:6px;font-size:12px;font-weight:700;color:#1b1300;background:#f2c230;border-radius:999px;padding:2px 9px;animation:evp 1.6s ease-in-out infinite}
+.evpick select.hot{outline:2px solid #f2c230;outline-offset:1px}
+@keyframes evp{50%{opacity:.55}}@media (prefers-reduced-motion:reduce){.evhint{animation:none}}
 .tut{position:fixed;inset:0;z-index:70;background:rgba(5,16,30,.72);display:grid;place-items:center;padding:16px}.tut[hidden]{display:none}
 .tutbox{max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}.tutbox h3{font-family:var(--f-display);margin:4px 0;font-size:19px}.tutbox small{font-family:var(--f-mono);color:var(--chalk-dim)}
 .itemfx{border:1px solid var(--panel-line);border-left:3px solid var(--hl);border-radius:5px;padding:6px 8px;margin:6px 0;font-size:13px;line-height:1.5}.itemfx small{opacity:.8}
@@ -214,14 +221,14 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
     <div class="tabs" role="tablist" id="tabs"></div>
     <button class="tbtn" id="borpBtn" type="button" aria-pressed="false" title="備援手術小組（BORP）進駐，開設手術室">第三類急救站（BORP）</button>
     <button class="tbtn" id="radBtn" type="button" aria-pressed="false" title="有 X 光機的場地可加派一名放射師；沒有放射師時由醫師操作" hidden>配置放射師</button>
-    <span class="stage">第一層・站級配置</span>
+
     <div class="tools">
       <button class="tbtn" id="themeBtn" type="button" title="切換白底／深藍藍圖配色">藍圖</button>
       <button class="tbtn" id="zoomOut" type="button" aria-label="縮小">－</button>
       <button class="tbtn" id="zoomFit" type="button">符合視窗</button>
       <button class="tbtn" id="zoomIn" type="button" aria-label="放大">＋</button>
       <button class="tbtn" id="clearMap" type="button">清空本圖</button>
-      <label class="evpick">事件卡 <select id="evSel" aria-label="事件卡"></select></label>
+      <label class="evpick">事件卡 <select id="evSel" aria-label="事件卡"></select><span class="evhint" id="evHint">← 第二輪可抽事件卡！</span></label>
       <button class="tbtn" id="tutBtn" type="button">教學</button>
       <button class="tbtn go" id="runSim" type="button">開始模擬</button>
       <button class="tbtn" id="editMap" type="button" hidden>修改場地</button>
@@ -260,14 +267,14 @@ const ping = n => (n*PING_PER_CELL).toFixed(1);
 
 // 功能區定義（坪數來源：指引 p.10–16；標「遊戲假設」者為自訂）
 const FUNCS = {
-  triage:{name:'檢傷掛號',ping:4,src:'指引 p.10',where:'in',color:'#f39c4a',desc:'患者進站第一站：檢傷分級、掛號建檔、簡易除污。'},
-  major:{name:'重傷區',ping:4,src:'遊戲假設（三區合計 11 坪，指引 p.12；重傷／中傷／輕傷分類見指引附件通報表）',where:'in',color:'#138f82',num:true,desc:'收治紅色（復甦急救）患者：急救與治療，含急救床。客滿時可借中傷區、輕傷區。'},
-  mid:{name:'中傷區',ping:3,src:'遊戲假設（三區合計 11 坪，指引 p.12；重傷／中傷／輕傷分類見指引附件通報表）',where:'in',color:'#3fc2ae',num:true,desc:'收治黃色（緊急）患者。客滿時可借輕傷區，不占重傷區的床；沒擺中傷區時黃色進重傷區。'},
-  minor:{name:'輕傷區',ping:4,src:'遊戲假設（三區合計 11 坪，指引 p.12）',where:'in',color:'#8fe8d8',num:true,desc:'收治綠色（非緊急）患者：問診、傷口處理。重傷區、中傷區客滿時借床給紅、黃。'},
+  triage:{name:'檢傷掛號',ping:4,src:'指引 p.10',where:'in',color:'#f39c4a',desc:'患者進站第一站：檢傷分級、掛號建檔。'},
+  major:{name:'重傷區',ping:4,src:'遊戲假設（三區合計 11 坪，指引 p.12；重傷／中傷／輕傷分類見指引附件通報表）',where:'in',color:'#138f82',num:true,desc:'收治紅色（立即處置）患者：急救與治療，含急救床。客滿時可借中傷區、輕傷區。'},
+  mid:{name:'中傷區',ping:3,src:'遊戲假設（三區合計 11 坪，指引 p.12；重傷／中傷／輕傷分類見指引附件通報表）',where:'in',color:'#3fc2ae',num:true,desc:'收治黃色（延遲處置）患者。客滿時可借輕傷區；躺床的黃色也可以借重傷區，坐著的不占重傷區的床；沒擺中傷區時黃色進重傷區。'},
+  minor:{name:'輕傷區',ping:4,src:'遊戲假設（三區合計 11 坪，指引 p.12）',where:'in',color:'#8fe8d8',num:true,desc:'收治綠色（輕傷）患者：問診、傷口處理。重傷區、中傷區客滿時借床給紅、黃。'},
   obs:{name:'留觀區',ping:6,src:'遊戲假設',where:'in',color:'#5aa9e6',desc:'短暫留觀或延長照護，等待轉出或出院。'},
   iso:{name:'隔離區',ping:3,src:'遊戲假設',where:'in',color:'#e05a9b',desc:'疑似傳染病患者使用，含穿脫防護裝備空間。'},
   pharm:{name:'藥局',ping:4,src:'指引 p.10',where:'in',color:'#7bd389',desc:'藥品調劑與領藥。'},
-  store:{name:'庫備品區',ping:4,src:'指引 p.10',where:'in',color:'#c9d65b',desc:'藥品、衛材、重症設備（插管組、胸管組等）的庫存。'},
+  store:{name:'庫備品區',ping:4,src:'指引 p.10',where:'in',color:'#c9d65b',desc:'即庫房：藥品、衛材、重症設備（插管組、胸管組等）的庫存。'},
   public:{name:'公共空間',ping:5,src:'指引 p.10',where:'in',color:'#8fb8e3',desc:'候診、候藥、領藥，也是家屬等候的地方。'},
   waste:{name:'廢棄物處理區',ping:2,src:'指引 p.10',where:'in',color:'#b98a5e',desc:'醫療廢棄物暫存，等待清運。'},
   admin:{name:'行政區',ping:5,src:'指引 p.10',where:'in',color:'#a99be6',desc:'指揮中心：任務分派、對外通訊、文件管理。'},
@@ -366,17 +373,19 @@ function mapHall(){
 // 長條場地（焜哥 2026-11-14 提供：14 × 5.5 m；上方長邊靠兩端各一個 1 m 門，門外是走廊；四個角落各 2 個插座；無廁所、水槽、柱子）
 // 11-14 更正：患者入口是走廊上方正中間的斜坡，走廊右端不開口。走廊寬 2 m、斜坡寬 2 m、斜坡外 3.5 m 空地接道路是暫定
 function mapStrip(){
-  const W=32,H=28,vx=0,vy=0,g=grid(W,H,'G');
-  fill(g,0,0,W-1,1,'R');fill(g,1,9,30,26,'W');fill(g,2,10,29,13,'F');fill(g,2,15,29,25,'F');
+  const W=32,H=31,vx=0,vy=0,g=grid(W,H,'G');
+  fill(g,0,0,W-1,1,'R');fill(g,1,9,30,26,'W');
+  // 右下角陽台（焜哥 2026-11-18）：沿牆 2 m × 深 1.5 m，室外，只能從房間底牆 1 m 的門出去
+  fill(g,25,27,30,30,'W');fill(g,26,27,29,29,'G');fill(g,27,26,28,26,'D');fill(g,2,10,29,13,'F');fill(g,2,15,29,25,'F');
   fill(g,14,9,17,9,'M');fill(g,3,14,4,14,'D');fill(g,27,14,28,14,'D');
   const feats={};[[6,15],[2,17],[25,15],[29,17],[5,25],[2,23],[26,25],[29,23]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
-  return {id:'strip',tab:'長條場地',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[26,1],feats,rooms:[{name:'長條場地',x:2,y:15,w:28,h:11}],
+  return {id:'strip',tab:'長條場地',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[26,1],feats,rooms:[{name:'長條場地',x:2,y:15,w:28,h:11},{name:'陽台',x:26,y:27,w:4,h:3,small:1}],
     dim:{x:2,y:15,w:28,h:11,top:5.4,side:-1.4},
     corridor:{t:'走廊（長 14 m、寬 2 m）',x:16,y:12.6},
-    outLabels:[{t:'道路',x:2,y:1.4},{t:'空地',x:2,y:3.8}],
+    outLabels:[{t:'道路',x:2,y:1.4},{t:'空地',x:2,y:3.8},{t:'陽台',x:26.2,y:28.9}],
     entrances:[{x:15.5,y:9,t:'斜坡（患者入口）',side:'n'}],
     scenario:'在一間長條形的房間開設急救站。患者從走廊中間的斜坡進來，再從兩個小門進房間。',
-    facts:['室內 14 × 5.5 m，中間沒有柱子','房間上方長邊靠左、靠右各一個 1 m 寬的門，通往走廊','走廊（暫定寬 2 m）兩端不通，唯一出入口是走廊上方正中間的斜坡','斜坡擔架推得過，外面是空地和道路','四個角落各有 2 個插座','沒有廁所、沒有水槽']};
+    facts:['室內 14 × 5.5 m，中間沒有柱子','房間上方長邊靠左、靠右各一個 1 m 寬的門，通往走廊','走廊（暫定寬 2 m）兩端不通，唯一出入口是走廊上方正中間的斜坡','斜坡擔架推得過，外面是空地和道路','四個角落各有 2 個插座','沒有廁所、沒有水槽','右下角有一個 2 × 1.5 m 的陽台（室外），只能從房間底牆的 1 m 門出去']};
 }
 const BUILTIN = [mapClassroom(), mapHealth(), mapUnderground(), mapHall(), mapStrip()];
 const MAPBY = Object.fromEntries(BUILTIN.map(m=>[m.id,m]));
@@ -881,7 +890,7 @@ function renderInfo(){
   }
   $('#sideTitle').textContent='場地說明';
   const list=zones().slice().sort((a,b)=>a.id-b.id);
-  info.innerHTML=`<div class="scenario"><b>情境</b>${m.scenario}</div>${checkHTML()}
+  info.innerHTML=`<div class="scenario"><b>情境</b>${m.scenario}<br><small>本關只模擬開站後前 4 小時；紅黃綠是現場檢傷後的分級（紅＝立即、黃＝延遲、綠＝輕傷、黑＝死亡），本關不練檢傷判斷，重點是佈局。${m.id==='strip'?'這張場地很窄，主要功能區很難全部放下，星等僅供參考，重點是練習取捨。':''}</small></div>${checkHTML()}
     ${state.borp?'<div class="scenario"><b>第三類急救站</b>備援手術小組（BORP）已奉派進駐，要在站內開設檢傷分類區、手術室、術後恢復區，對有生命危險或肢體損害風險的傷患進行損傷控制手術，穩定後再後送。</div>':''}
     <div class="sub">場地條件</div><ul class="facts">${m.facts.map(f=>`<li>${f}</li>`).join('')}</ul>
     <div class="sub">圖例</div>
@@ -1144,7 +1153,7 @@ const P = {
   walk:1/CELL_M,                              // 步行 1 m/s
   stretcherMul:.5, stairWalkMul:.5, stairStretcherMul:.2,
   cellCap:2, squeezeAfter:3,                  // 每格最多 2 人（擔架算 2）；卡住 3 秒後硬擠過去
-  xray:{rate:.5,t:120,at:.6,isoClean:300}, // 有 X 光機的場地（焜哥 2026-11-17）：診療中約 5 成要照 X 光，一次 2 分；照到診療 4 成時離床去照；疑似傳染照完消毒 5 分（遊戲假設）
+  xray:{rate:.4,t:120,at:.6,isoClean:300}, // 有 X 光機的場地（焜哥 2026-11-17）：診療中約 4 成要照 X 光，一次 2 分；照到診療 4 成時離床去照；疑似傳染照完消毒 5 分（遊戲假設）
   jam:{shift:60,squeeze:120,temp:300,shiftAdd:60,slow:.5}, // 路被擋住（焜哥 2026-11-15）：1 分挪動擋路患者（被挪的多花 1 分）→ 2 分硬擠過患者旁（速度減半）→ 5 分就地設臨時醫療點
   per:{triage:2, pharm:2, morgue:1.25, borpTri:2, or:7, pacu:2},       // 這三區仍以坪數算位子；診療、留觀、隔離、候診改用患者佔地
   t:{triage:60, triageRed:60, treat:{g:300,y:900,r:1800,i:900}, iso:900, pharm:120, obsY:1800, obsR:1200, borpTri:600, or:4800, pacu:600, surgAssess:300},
@@ -1166,7 +1175,7 @@ const PARAM_TEXT = [
   '留觀：中症 30 分、重症 20 分後轉出；中症一半需要留觀，留觀中 10% 惡化轉出',
   '佔地：坐 1 × 1 m，躺 1 × 2 m（可直放橫放）；輕症全坐、重症全躺、中症一半躺；疑似傳染躺',
   '所有躺床：床頭外留 0.5 m 站醫師做頭部處置（頭對頭兩床可共用）。重傷區的床兩個長邊外各留 0.5 m（可與隔壁床共用）；其他區床與床之間都隔 0.5 m，每床至少一側站得了人（靠區塊邊緣的那床可以只有一側）。候診座位不分組，有空位就整排排滿',
-  '有 X 光機的場地（衛生所）：約 5 成患者診療中途要離床照 X 光，一次 2 分鐘，照完回原床做完處置；擔架患者來回都要 2 人抬。可加派放射師；沒有就由醫師操作，醫師順序是紅色患者＞紅色 X 光＞黃色患者＞黃色 X 光＞綠色患者＞綠色 X 光（疑似傳染比照黃色，照完機器消毒 5 分鐘）',
+  '有 X 光機的場地（衛生所）：約 4 成患者診療中途要離床照 X 光，一次 2 分鐘，照完回原床做完處置；擔架患者來回都要 2 人抬。可加派放射師；沒有就由醫師操作，醫師順序是紅色患者＞紅色 X 光＞黃色患者＞黃色 X 光＞綠色患者＞綠色 X 光（疑似傳染比照黃色，照完機器消毒 5 分鐘）',
   '路被擋住時：卡 1 分鐘先把擋路的患者挪到同區別的位子（被挪的人處置多 1 分鐘）；挪不動，卡 2 分鐘就從患者旁邊慢慢擠過去；被區塊或封鎖線整個堵死，卡 5 分鐘就地設臨時醫療點，要出站或轉送的靠人力抬出。不會自動搬動功能區',
   '重症長邊外側要留 0.5 m 走道，兩床可共用；患者是障礙物不能跨越，擺放時一定留出通道（擔架 1 m、步行 0.5 m）',
   '檢傷 2 坪、藥局窗口 2 坪、遺體 1.25 坪各一位',
@@ -1611,7 +1620,7 @@ function startJob(s,j){s.state='busy';s.task=j;const W=map().W,store=storeZone()
 function staffArrived(s){const t=s.task,W=map().W; s.goal=null; if(!t)return;
   if(t.k==='post'){return}
   if(t.k==='bedside'){t.a.coming--;if(t.help)t.t0=sim.t;return}
-  if(t.k==='carry'){const a=t.a,c=a.carry;c.coming--;if(!c.coming){a.carried=true;a.waitTotal+=sim.t-a.cs;a.cs=null;
+  if(t.k==='carry'){const a=t.a,c=a.carry;c.coming--;if(!c.coming){a.carried=true;a.waitTotal+=sim.t-a.cs;a.wl=(a.wl||0)+sim.t-a.cs;a.cs=null;
       c.crew.forEach(p=>{sim.occ[p.cy*W+p.cx]-=1;p.follow=a})}return}
   if(t.k==='calm'){s.timer=t.sec||0;s.onDone=()=>freeStaff(s);return}
   if(t.k==='need'){s.timer=P.needDur[t.n.k];s.onDone=()=>freeStaff(s);return}
@@ -1679,7 +1688,7 @@ function want(a,f){
 // 檢傷位子被「人還沒到」或「還沒開始檢傷」的非重症佔著時，讓給重症；讓位者回到排隊，留在原地等
 function yieldSlot(f){const r=sim.R[f],v=r.slots.map(x=>x.occ).filter(b=>b&&b.cat!=='r'&&((b.goalKind==='slot'&&!b.carried)||(b.svc===f&&b.await&&b.await.length&&!b.coming))).sort((p,q)=>PRIO[q.cat]-PRIO[p.cat]||q.id-p.id)[0];
   if(!v)return null;const sl=v.slot.s;v.slot=null;sl.occ=null;v.goal=null;v.goalKind=null;v.svc=null;v.await=null;v.timer=0;dropCarry(v);
-  if(v.cs!=null){v.waitTotal+=sim.t-v.cs;v.cs=null} if(v.ss!=null){v.waitTotal+=sim.t-v.ss;v.ss=null}
+  if(v.cs!=null){v.waitTotal+=sim.t-v.cs;v.wl=(v.wl||0)+sim.t-v.cs;v.cs=null} if(v.ss!=null){v.waitTotal+=sim.t-v.ss;v.ws=(v.ws||0)+sim.t-v.ss;v.ss=null}
   v.waitFor=f;v.waitSince=sim.t;r.queue.push(v);r.queue.sort((p,q)=>PRIO[p.cat]-PRIO[q.cat]||p.id-q.id);return sl}
 // 診療：先找本區；紅、黃本區客滿就照 borrowOf 跨區借床；都滿了在本區排隊。輕症不跨區，在公共空間候診
 function wantTreat(a){
@@ -1691,7 +1700,7 @@ function wantTreat(a){
 function takeSlot(a,f,s){
   if(isTreat(f)&&f!==homeTreat(a)&&has(homeTreat(a))) sim.stats.supported++;
   const old=a.slot; s.occ=a; a.stay=false; if(s.rect)commit(s); a.slot={f,s};
-  if(a.waitSince!=null){a.waitTotal+=sim.t-a.waitSince;a.waitSince=null} a.waitFor=null;
+  if(a.waitSince!=null){a.waitTotal+=sim.t-a.waitSince;a.wl=(a.wl||0)+sim.t-a.waitSince;a.waitSince=null} a.waitFor=null;
   freeSpot(a); if(old) freeSlot(old);
   setGoal(a,s.rect?around(s.r):[[s.x,s.y]],'slot');
 }
@@ -1748,7 +1757,7 @@ function arrived(a){
   if(k==='wait'&&a.spot&&a.spot.kind==='seat') settle(a,a.spot.s);
   // 'wait'：到等候位置，靜待叫號
 }
-function leave(a,why){a.gone=true; dropCarry(a); releaseCrew(a); if(a.slot){const s=a.slot;a.slot=null;freeSlot(s)} freeSpot(a);
+function leave(a,why){a.gone=true;a.tOut=sim.t; dropCarry(a); releaseCrew(a); if(a.slot){const s=a.slot;a.slot=null;freeSlot(s)} freeSpot(a);
   sim.occ[a.cy*map().W+a.cx]-=a.str?2:1; sim.stats[why]++; sim.stats.waits.push(a.waitTotal); if(a.node){a.node.remove();a.node=null} if(a.tempNode){a.tempNode.remove();a.tempNode=null}}
 
 // 服務完成後下一步
@@ -1915,7 +1924,8 @@ function tick(dt){
     if(a.goal){if(a.str&&!a.carried){askCarry(a);continue} moveAgent(a,dt);continue}
     if(a.svc==='xray'&&a.xrQ!=null){if(sim.xrUser||sim.t<sim.xrFree)continue;   // X 光機一次一人；消毒中也要等
       sim.xrUser=a;a.waitTotal+=sim.t-a.xrQ;sim.stats.xrWait+=sim.t-a.xrQ;a.xrQ=null;a.timer=P.xray.t;a.crew=[];a.coming=0;a.await=[sim.radOn?'rad':'doc'];a.ss=sim.t}
-    if(a.await){if(a.await.length||a.coming)continue;a.await=null;a.waitTotal+=sim.t-a.ss;a.ss=null;
+    if(a.await){if(a.await.length||a.coming)continue;a.await=null;a.waitTotal+=sim.t-a.ss;a.ws=(a.ws||0)+sim.t-a.ss;a.ss=null;
+      if(a.seen==null&&(isTreat(a.useF)||['iso','borpTri','or'].includes(a.useF))){a.seen=sim.t-a.t0;a.seenCat=a.cat;a.seenL=a.wl||0;a.seenS=a.ws||0}   // 開始處置前的等候：wl＝等床位、擔架（佈局能改）；ws＝等醫師護理師（人力）
       if(!a.stocked){a.stocked=true;if(!takeStock(a,a.useF)){a.noStock=sim.t;sim.stats.stockouts++}askFetch(a)}}
     if(a.noStock!=null){const late=sim.t-a.noStock>=P.improvise;if(!late&&!takeStock(a,a.useF))continue;sim.stats.supplyDelay+=Math.min(sim.t-a.noStock,P.improvise);a.noStock=null}
     if(a.fetchAt!=null&&a.svc!=='xray'&&a.timer<=a.fetchAt){sim.stats.supplyDelay+=dt;continue}
@@ -1948,7 +1958,7 @@ function scanAlerts(){
   if(nw.length)hit('noway','bad',nw.length,`${nw.length} 名患者的路被擋住`,'擔架要 1 m 寬的走道，也不能穿過遺體、庫備品、廢棄物區或封鎖線',nw[0].useF);
   const lane=(f,min,text,tip)=>{const q=sim.R[f].queue.filter(a=>!a.gone&&a.waitSince!=null&&sim.t-a.waitSince>60);if(q.length>=min)hit('q'+f,f==='major'?'bad':'warn',q.length,text(q.length),tip,f)};
   lane('major',1,n=>`重傷區沒有空床，${n} 人在等`,'區塊拉大，或讓處置完的重症盡快到留觀區');
-  lane('mid',1,n=>`中傷區沒有空床，${n} 人在等`,'中傷區拉大；黃色可借輕傷區，不能占重傷區');
+  lane('mid',1,n=>`中傷區沒有空床，${n} 人在等`,'中傷區拉大；黃色可借輕傷區，躺床的黃色也可以借重傷區');
   lane('minor',1,n=>`輕傷區沒有空位，${n} 人在候診`,'輕傷區拉大，或留意是否被紅、黃佔用');
   lane('obs',1,n=>`留觀區客滿，${n} 人佔著診療床等待`,'留觀區太小會回堵診療區（指引 p.13）');
   lane('iso',1,n=>`隔離區客滿，${n} 人在等`,'隔離區要有獨立空間與動線（指引 p.14）');
@@ -2201,12 +2211,22 @@ const EVENTS={
 function fireEvent(){const k=sim.evKey,E=EVENTS[k];sim.evFired=true;Object.keys(sim.stock).forEach(checkStock);const msg=E.run();sim.evMsg=msg;toast(`事件：${E.name}`);renderInfo()}
 
 // ---- 結算（Sprint 5）：門檻是遊戲假設 ----
-const GOALS={staffWalk:5000,maxWait:110,stockouts:0,patientWalk:3000,carries:30,supplyDelay:0,cross:0};
+const GOALS={staffWalk:5000,wait:{r:15,y:60,g:110},stockouts:0,patientWalk:3000,carries:30,supplyDelay:0,cross:0};
 function evaluate(){
   const s=sim.stats,W=map().W,inside=sim.agents.filter(a=>!a.gone);
-  const maxWait=s.waits.concat(inside.map(a=>a.waitTotal+(a.waitSince!=null?sim.t-a.waitSince:0)+(a.ss!=null?sim.t-a.ss:0)+(a.cs!=null?sim.t-a.cs:0))).reduce((m,v)=>Math.max(m,v),0)/60;
-  const ind=[['人員總步行距離',Math.round(s.staffWalk),'m',GOALS.staffWalk],['最長等候的那一位',Math.round(maxWait),'分',GOALS.maxWait],['物資斷貨次數',s.stockouts,'次',GOALS.stockouts],
+  // 依傷勢分開看開始處置前的等候（焜哥 2026-11-18 選 C）：星等只看等床位、等擔架（佈局能改善）；等醫師護理師另列、不計星
+  // 疑似傳染算黃色；還沒開始處置的算到現在（已離站的不再累加）
+  const dw={r:null,y:null,g:null},ds={r:null,y:null,g:null};
+  for(const a of sim.agents){if(a.cat==='b'||a.stage==='body')continue;let k=a.seenCat||a.cat;if(k==='i')k='y';if(!(k in dw))continue;
+    const on=!a.gone,L=a.seen!=null?a.seenL:(a.wl||0)+(on&&a.waitSince!=null?sim.t-a.waitSince:0)+(on&&a.cs!=null?sim.t-a.cs:0),
+      S=a.seen!=null?a.seenS:(a.ws||0)+(on&&a.ss!=null?sim.t-a.ss:0);
+    dw[k]=Math.max(dw[k]??0,L/60);ds[k]=Math.max(ds[k]??0,S/60)}
+  const CN={r:'紅',y:'黃',g:'綠'},GW=GOALS.wait,wOk=['r','y','g'].every(k=>dw[k]==null||dw[k]<=GW[k]),
+    wTxt=['r','y','g'].map(k=>`${CN[k]} ${dw[k]==null?'—':Math.round(dw[k])}`).join('・'),sTxt=['r','y','g'].map(k=>`${CN[k]} ${ds[k]==null?'—':Math.round(ds[k])}`).join('・');
+  const ind=[['人員總步行距離',Math.round(s.staffWalk),'m',GOALS.staffWalk],
+    ['物資斷貨次數',s.stockouts,'次',GOALS.stockouts],['物資斷貨次數',s.stockouts,'次',GOALS.stockouts],
     ['患者移動距離',Math.round(s.patientWalk),'m',GOALS.patientWalk],['患者被搬運次數',s.carries,'趟',GOALS.carries],['處置因取物資延誤',Math.round(s.supplyDelay/60),'分',GOALS.supplyDelay],['動線交叉次數',s.cross,'次',GOALS.cross]].map(([n,v,u,g])=>({n,v,u,g,ok:v<=g}));
+  ind.splice(1,0,{n:'各色等床位、擔架（最久）',v:wTxt,u:'分',gt:`紅 ${GW.r}・黃 ${GW.y}・綠 ${GW.g} 分內`,ok:wOk});
   // BORP 關多 2 項：進站到開刀（遊戲假設 30 分內）、4 小時內完成 1 台刀
   if(sim.borp){ind.push({n:'需手術者進站到開刀',v:s.orAt==null?'沒開刀':Math.round(s.orAt/60),u:s.orAt==null?'':'分',g:30,ok:s.orAt!=null&&s.orAt/60<=30});
     ind.push({n:'完成手術',v:s.surgDone,u:'台',g:P.orGoal,gt:`目標 ${P.orGoal} 台`,ok:s.surgDone>=P.orGoal})}
@@ -2218,9 +2238,11 @@ function evaluate(){
   const tri=firstZone('triage'),maj=firstZone('major'),amb=firstZone('amb'),sto=firstZone('store'),obs=firstZone('obs'),pub=firstZone('public');
   if(s.tempSite)note(`${s.tempSite} 名患者走不到該去的區塊，就地設臨時醫療點`,'區塊或封鎖線把唯一的路堵死，患者不能穿越','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
   if(s.noWayOut)note(`${s.noWayOut} 名患者走不到出口或救護車區，靠人力抬出`,'出口、救護車區的路被區塊堵死','遊戲假設：患者不可穿越遺體、庫備品、廢棄物區');
-  if(sim.xr&&s.xrDone)note(sim.radOn?`放射師照了 ${s.xrDone} 人 X 光`:`沒有放射師，醫師照 X 光共 ${Math.round(s.xrDoc/60)} 分（${s.xrDone} 人）`,sim.radOn?'醫師可以專心處置患者':'照 X 光時醫師離開診療區，其他患者要等','遊戲假設：約 5 成患者需要 X 光，一次 2 分');
+  if(sim.xr&&s.xrDone)note(sim.radOn?`放射師照了 ${s.xrDone} 人 X 光`:`沒有放射師，醫師照 X 光共 ${Math.round(s.xrDoc/60)} 分（${s.xrDone} 人）`,sim.radOn?'醫師可以專心處置患者':'照 X 光時醫師離開診療區，其他患者要等','遊戲假設：約 4 成患者需要 X 光，一次 2 分');
   if(s.xrSkip)note(`${s.xrSkip} 名患者走不到 X 光室，沒照到 X 光`,'X 光室的路被區塊或封鎖線堵住','遊戲假設');
   if(s.shifted||s.squeezed)note(`路被患者擋住：挪動患者 ${s.shifted} 次、硬擠過去 ${s.squeezed} 次`,'床位、座位擺太滿，走道被佔走','擔架要 1 m 寬的走道（遊戲假設）');
+  for(const k of ['r','y','g'])if(dw[k]!=null&&dw[k]>GW[k])note(`${CN[k]}色患者開始處置前，等床位、擔架最久 ${Math.round(dw[k])} 分`,`超過 ${GW[k]} 分；診療區床位不夠、借床規則用不上，或擔架抬得太遠`,'遊戲假設：紅 15 分、黃 60 分、綠 110 分內');
+  if(['r','y','g'].some(k=>ds[k]>=1))note(`開始處置前等醫師、護理師最久：${sTxt} 分`,'人力只有醫師 2、護理師 3，同時湧入時一定要排隊；這是人力不足，改佈局解決不了，不計入星等','遊戲假設');
   if(!tri) note('沒有設檢傷掛號區','患者進站後沒有分流，重症沒有優先處置','指引 p.12：檢傷區靠近入口、單一入口');
   else{const d=Math.min(...sim.exits.map(([x,y])=>Math.abs(x-tri.x)+Math.abs(y-tri.y)))*CELL_M;if(d>15)note(`檢傷區離出入口約 ${Math.round(d)} m`,'患者要先穿過站內才能分流','指引 p.12：檢傷區靠近入口')}
   if(s.crossIso)note('疑似傳染患者穿過公共空間','候診區有人開始發燒，其他等候者暴露','指引 p.14：隔離區動線不經公共空間');
@@ -2319,9 +2341,9 @@ $('#runSim').onclick=()=>startSim();
 $('#evSel').innerHTML='<option value="">不抽（第一輪）</option><option value="rand">隨機抽一張</option>'+Object.keys(EVENTS).map(k=>`<option value="${k}">${EVENTS[k].name}</option>`).join('');
 // 重新開始時沿用同一張牌，才能比較改版前後
 let rolled='';function evPick(){const v=$('#evSel').value;if(v!=='rand')return v;if(!rolled){const ks=Object.keys(EVENTS);rolled=ks[Math.floor(Math.random()*ks.length)]}return rolled}
-$('#evSel').onchange=()=>{rolled=''};
+$('#evSel').onchange=()=>{rolled='';if($('#evSel').value){$('#evHint').hidden=true;$('#evSel').classList.remove('hot')}};$('#evSel').classList.add('hot');
 // 新手教學
-const TUT=[['擺放功能區','點上方卡片，再到平面圖上拖曳畫出範圍；拖右下角黃點調大小。1 格是 0.5 m，4 格是 1 平方公尺。'],['想清楚動線','患者從檢傷進站，紅色到重傷區、黃色到中傷區，疑似傳染要去隔離區。患者是障礙物，一定要留通道。'],['按開始模擬','4 小時壓縮成約 3 分鐘。看誰在等，等的是床位，還是醫師、護理師或擔架人手。'],['看結算再改版','結束後看 7 項指標和回饋，改配置後再跑一次。第二輪從上方選事件卡。']];
+const TUT=[['擺放功能區','點上方卡片，再到平面圖上拖曳畫出範圍；拖右下角黃點調大小。1 格是 0.5 m，4 格是 1 平方公尺。'],['想清楚動線','患者從檢傷進站，紅色到重傷區、黃色到中傷區，疑似傳染要去隔離區。患者是障礙物，一定要留通道。'],['按開始模擬','4 小時壓縮成約 3 分鐘。看誰在等，等的是床位，還是醫師、護理師或擔架人手。'],['哪些區一定要擺','檢傷、診療區（重傷／中傷／輕傷至少一區）、留觀、隔離、藥局、公共空間、遺體、庫備品、廢棄物都要擺；BORP 關還要手術室。少擺任何一區，最多只拿 1 星。封鎖線和帳篷是選用的。'],['第二層：擺器材','點一下已擺好的區塊，右側會出現器材：外傷治療車、生理監視器、急救藥箱、物資櫃、流動洗手台。可以擺進區內，點器材會顯示效果範圍和效果內容。'],['看結算，再抽事件卡','結束後看指標和回饋，改配置後再跑一次。第一輪先不抽；第二輪從右上角「事件卡」抽一張（停電、大量傷患、物資延誤等），看你的配置撐不撐得住。']];
 let tutI=0;function tutShow(){const [t,b]=TUT[tutI];$('#tutN').textContent=`${tutI+1} / ${TUT.length}`;$('#tutT').textContent=t;$('#tutB').textContent=b;$('#tutNext').textContent=tutI===TUT.length-1?'開始佈置':'下一步';$('#tut').hidden=false}
 function tutClose(){$('#tut').hidden=true;try{localStorage.setItem('mrs-tut-v1','1')}catch(e){}}
 $('#tutBtn').onclick=()=>{tutI=0;tutShow()};$('#tutSkip').onclick=tutClose;$('#tutNext').onclick=()=>{if(++tutI>=TUT.length)tutClose();else tutShow()};
