@@ -213,12 +213,54 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
   .side{overflow:visible}
 }
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+/* 手機版（≤700px，焜哥 2026-11-18）：地圖在上占大部分；下方抽屜用分頁切換「擺放／控制」和「說明／結果」；次要按鈕收進 ⋯ */
+.msel,.mmore,.mtabs{display:none}
+.zmenu{position:fixed;z-index:65;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.3);padding:8px;display:grid;gap:6px;min-width:180px}.zmenu[hidden]{display:none}
+.zmenu b{font-family:var(--f-display);font-size:15px;padding:2px 4px}
+.zmenu button{font-size:15px;text-align:left;padding:10px 12px;border:1px solid var(--panel-line);background:var(--blue);border-radius:7px}.zmenu .danger{color:var(--bad)}
+@media (max-width:700px){
+  body{overflow:hidden}
+  .app{height:100vh;height:100dvh;min-height:0;padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+  .top{gap:6px;padding-block:6px;flex-wrap:wrap}
+  .brand small{display:none}.brand b{font-size:16px}
+  .tabs{display:none}
+  .msel{display:block;flex:1 1 auto;min-width:0;font:inherit;font-size:14px;color:var(--chalk);background:var(--panel);border:1px solid var(--panel-line);border-radius:6px;padding:5px 6px}
+  .mmore{display:inline-block}
+  .tools{margin-left:0;width:100%;gap:5px}
+  .tools>*:not(.evpick):not(#runSim):not(#moreBtn):not(#editDone),#borpBtn,#radBtn{display:none}
+  body.more .tools{flex-wrap:wrap}
+  body.more .tools>*:not([hidden]),body.more #borpBtn{display:inline-block!important}
+  body.more #radBtn:not([hidden]){display:inline-block!important}
+  body.more .evpick{display:flex!important;flex-basis:100%}
+  body.more .evpick select{width:auto;flex:1 1 auto}
+  .res tr{display:grid;grid-template-columns:1fr auto;border-top:1px solid var(--panel-line)}.res td{border-top:none}
+  .res td:first-child{grid-column:1/-1;padding-bottom:0;font-weight:500}.res td:nth-child(3){font-size:11.5px;text-align:right}
+  .evpick{flex:1 1 0;display:flex;align-items:center;gap:4px;min-width:0}.evpick select{min-width:0;width:0;flex:1 1 auto}
+  .tools{flex-wrap:nowrap}
+  .evhint{font-size:0;padding:2px 7px;white-space:nowrap}.evhint::after{content:'← 可抽事件卡！';font-size:11px}
+  .evpick{font-size:0}.evpick select{font-size:13.5px}
+  .brand b{font-size:15px}
+  #runSim{margin-left:auto}
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto minmax(0,36%);grid-template-areas:"map" "mt" "sheet";gap:6px;padding-block:6px max(6px,env(safe-area-inset-bottom,0px))}
+  .palette,.side{grid-area:sheet;overflow:auto;align-content:flex-start}
+  .mapwrap{max-height:none}
+  body:not(.mt-side) .side,body.mt-side .palette{display:none}
+  .mtabs{display:flex;grid-area:mt;gap:4px}
+  .mtabs button{flex:1;border:1px solid var(--panel-line);background:var(--panel);border-radius:6px;padding:6px;font-size:14px}
+  .mtabs button[aria-selected=true]{background:var(--chalk);color:var(--blue-deep);border-color:var(--chalk);font-weight:700}
+  .palette .hint{display:none}
+  .cards{gap:5px}
+  .card{min-height:40px;padding:5px 8px}.card .nm{font-size:13.5px}
+  .palette h2{display:none}
+  .pane h2{font-size:15px;padding:8px 10px 4px}
+}
 </style>
 
 <div class="app">
   <header class="top">
     <div class="brand"><b>急救站佈局挑戰</b><small>FIRST-AID STATION LAYOUT</small></div>
     <div class="tabs" role="tablist" id="tabs"></div>
+    <select class="msel" id="mapSel" aria-label="場地"></select>
     <button class="tbtn" id="borpBtn" type="button" aria-pressed="false" title="備援手術小組（BORP）進駐，開設手術室">第三類急救站（BORP）</button>
     <button class="tbtn" id="radBtn" type="button" aria-pressed="false" title="有 X 光機的場地可加派一名放射師；沒有放射師時由醫師操作" hidden>配置放射師</button>
 
@@ -228,9 +270,10 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
       <button class="tbtn" id="zoomFit" type="button">符合視窗</button>
       <button class="tbtn" id="zoomIn" type="button" aria-label="放大">＋</button>
       <button class="tbtn" id="clearMap" type="button">清空本圖</button>
-      <label class="evpick">事件卡 <select id="evSel" aria-label="事件卡"></select><span class="evhint" id="evHint">← 第二輪可抽事件卡！</span></label>
+      <label class="evpick">事件卡 <select id="evSel" aria-label="事件卡"></select><span class="evhint" id="evHint">← 可抽事件卡！</span></label>
       <button class="tbtn" id="tutBtn" type="button">教學</button>
       <button class="tbtn go" id="runSim" type="button">開始模擬</button>
+      <button class="tbtn mmore" id="moreBtn" type="button" aria-expanded="false" aria-label="更多功能">⋯</button>
       <button class="tbtn" id="editMap" type="button" hidden>修改場地</button>
       <button class="tbtn go" id="editDone" type="button" hidden>完成場地</button>
     </div>
@@ -246,6 +289,7 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
       <div class="simbar" id="simbar" hidden></div>
       <div class="lines" id="lines" hidden></div>
     </aside>
+    <div class="mtabs" role="tablist" id="mtabs"><button type="button" role="tab" data-t="pal" aria-selected="true">擺放／控制</button><button type="button" role="tab" data-t="side" aria-selected="false">說明／結果</button></div>
     <div class="mapwrap" id="mapwrap">
       <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
       <div class="scale"><i id="scalebar"></i><span>1 格 = 0.5 m（4 格 = 1 m²，約 13 格 = 1 坪）</span></div>
@@ -257,6 +301,7 @@ button:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="zmenu" id="zmenu" role="menu" hidden></div>
 <input type="file" id="bgFile" accept="image/*" hidden>
 <div class="tut" id="tut" hidden><div class="tutbox"><small id="tutN"></small><h3 id="tutT"></h3><p id="tutB"></p><div class="acts"><button class="tbtn" type="button" id="tutSkip">略過</button><button class="tbtn go" type="button" id="tutNext">下一步</button></div></div></div>
 
@@ -375,17 +420,17 @@ function mapHall(){
 function mapStrip(){
   const W=32,H=31,vx=0,vy=0,g=grid(W,H,'G');
   fill(g,0,0,W-1,1,'R');fill(g,1,9,30,26,'W');
-  // 右下角陽台（焜哥 2026-11-18）：沿牆 2 m × 深 1.5 m，室外，只能從房間底牆 1 m 的門出去
-  fill(g,25,27,30,30,'W');fill(g,26,27,29,29,'G');fill(g,27,26,28,26,'D');fill(g,2,10,29,13,'F');fill(g,2,15,29,25,'F');
+  // 右下角陽台（焜哥 2026-11-18）：沿牆 2.5 m × 深 1.5 m，室外，只能從房間底牆 1 m 的門出去
+  fill(g,24,27,30,30,'W');fill(g,25,27,29,29,'G');fill(g,27,26,28,26,'D');fill(g,2,10,29,13,'F');fill(g,2,15,29,25,'F');
   fill(g,14,9,17,9,'M');fill(g,3,14,4,14,'D');fill(g,27,14,28,14,'D');
   const feats={};[[6,15],[2,17],[25,15],[29,17],[5,25],[2,23],[26,25],[29,23]].forEach(([x,y])=>feats[`${x},${y}`]='outlet');
-  return {id:'strip',tab:'長條場地',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[26,1],feats,rooms:[{name:'長條場地',x:2,y:15,w:28,h:11},{name:'陽台',x:26,y:27,w:4,h:3,small:1}],
+  return {id:'strip',tab:'長條場地',W,H,vx,vy,pad:2.5,g0:g,g,arrive:[26,1],feats,rooms:[{name:'長條場地',x:2,y:15,w:28,h:11},{name:'陽台',x:25,y:27,w:5,h:3,small:1}],
     dim:{x:2,y:15,w:28,h:11,top:5.4,side:-1.4},
     corridor:{t:'走廊（長 14 m、寬 2 m）',x:16,y:12.6},
-    outLabels:[{t:'道路',x:2,y:1.4},{t:'空地',x:2,y:3.8},{t:'陽台',x:26.2,y:28.9}],
+    outLabels:[{t:'道路',x:2,y:1.4},{t:'空地',x:2,y:3.8},{t:'陽台',x:25.7,y:28.9}],
     entrances:[{x:15.5,y:9,t:'斜坡（患者入口）',side:'n'}],
     scenario:'在一間長條形的房間開設急救站。患者從走廊中間的斜坡進來，再從兩個小門進房間。',
-    facts:['室內 14 × 5.5 m，中間沒有柱子','房間上方長邊靠左、靠右各一個 1 m 寬的門，通往走廊','走廊（暫定寬 2 m）兩端不通，唯一出入口是走廊上方正中間的斜坡','斜坡擔架推得過，外面是空地和道路','四個角落各有 2 個插座','沒有廁所、沒有水槽','右下角有一個 2 × 1.5 m 的陽台（室外），只能從房間底牆的 1 m 門出去']};
+    facts:['室內 14 × 5.5 m，中間沒有柱子','房間上方長邊靠左、靠右各一個 1 m 寬的門，通往走廊','走廊（暫定寬 2 m）兩端不通，唯一出入口是走廊上方正中間的斜坡','斜坡擔架推得過，外面是空地和道路','四個角落各有 2 個插座','沒有廁所、沒有水槽','右下角有一個 2.5 × 1.5 m 的陽台（室外），只能從房間底牆的 1 m 門出去']};
 }
 const BUILTIN = [mapClassroom(), mapHealth(), mapUnderground(), mapHall(), mapStrip()];
 const MAPBY = Object.fromEntries(BUILTIN.map(m=>[m.id,m]));
@@ -473,7 +518,7 @@ function drawTents(){tentLayer.innerHTML='';
     if(round){const fs=Math.min(.9,(f.w+2)/textW(lb,1));el('text',{x:f.x+f.w/2,y:f.y-.55,class:'tentlbl',style:`font-size:${fs}px;fill:var(--tent-lbl)`},g).textContent=lb}
     else{const side=['n','s'].find(s=>!t.doors.includes(s));
       if(side){const fs=Math.min(.78,(t.w+1.4)/textW(lb,1));el('text',{x:t.x+t.w/2,y:(side==='n'?t.y-.5:t.y+t.h+.5),class:'tentlbl',style:`font-size:${fs}px`},g).textContent=lb}}
-    if(t.id===selTent&&mode==='layout')el('circle',{cx:f.x+f.w-.1,cy:f.y+f.h-.1,r:.75,class:'handle','data-thandle':t.id},g)})}
+    if(t.id===selTent&&mode==='layout')el('circle',{cx:f.x+f.w-.1,cy:f.y+f.h-.1,r:HANDLE_R(),class:'handle','data-thandle':t.id},g)})}
 function tentGhost(r,ok){ghostLayer.innerHTML='';const col=ok?'var(--ok)':'var(--bad)';
   tentShapeEl(r,.05,{class:'ghost'+(ok?'':' bad')},ghostLayer);
   if(r.shape!=='round')el('rect',{x:r.x,y:r.y,width:r.w,height:r.h,fill:'none',stroke:col,'stroke-width':.1,'stroke-dasharray':'.3 .25'},ghostLayer);
@@ -803,7 +848,7 @@ function drawZones(){
       const maxw=z.w-.5; tx.setAttribute('font-size',Math.min(1.5,maxw/Math.max(1,t.length)*1.0)+'px')});
     if(z.h>=4) el('text',{x:cx,y:y0+lines.length*lh-.2,class:'za'},g).textContent=ping(G.m.reduce((n,q)=>n+q.w*q.h,0))+' 坪';}
     (z.items||[]).forEach(it=>{const I=ITEMS[it.k];el('rect',{x:it.x+.06,y:it.y+.06,width:I.w-.12,height:I.h-.12,rx:.12,fill:I.color,stroke:'#0b1d30','stroke-width':.08,'pointer-events':'none'},g);const t=el('text',{x:it.x+I.w/2,y:it.y+.75,'font-size':'.72px',style:'fill:#0b1d30;stroke:none'},g);t.textContent=I.ch});
-    if(z.id===selected&&mode==='layout') el('circle',{cx:z.x+z.w-.1,cy:z.y+z.h-.1,r:.75,class:'handle','data-handle':z.id},g);
+    if(z.id===selected&&mode==='layout') el('circle',{cx:z.x+z.w-.1,cy:z.y+z.h-.1,r:HANDLE_R(),class:'handle','data-handle':z.id},g);
   });
   // 併成一區的外框：只畫與區外相鄰的邊
   new Set([...grp.values()].filter(G=>G.m.length>1)).forEach(G=>{const W=map().W,cells=new Set();G.m.forEach(z=>zoneCells(z).forEach(([x,y])=>cells.add(y*W+x)));
@@ -811,10 +856,15 @@ function drawZones(){
     el('path',{d,class:'gline',stroke:FUNCS[G.lead.funcs[0]].color},zoneLayer)});
   if(selItem&&!(zones().find(q=>q.id===selItem.z)?.items||[])[selItem.i])selItem=null;
   renderCards(); renderInfo(); save(); drawItemFx(); if(mode==='layout') scheduleCheck();
+  if(selected!==lastSelM){lastSelM=selected;if(selected!=null&&isMobile())setMTab('side')}   // 手機：點了區塊就翻到說明分頁看器材
 }
+let lastSelM=null;
+// 觸控螢幕的調整大小黃點放大，手指按得到（約 44 px）
+const COARSE=window.matchMedia('(pointer:coarse)');
+const HANDLE_R=()=>{if(!COARSE.matches)return .75;const cs=(+svg.getAttribute('width')||1)/((map().vw??map().W-map().vx)+2*(map().pad||0));return Math.max(.75,Math.min(1.5,22/cs))};
 function applyZoom(){
   const m=map(); const availW=wrap.clientWidth-2, availH=wrap.clientHeight-2;
-  const narrow=window.matchMedia('(max-width:1100px)').matches;
+  const narrow=window.matchMedia('(max-width:1100px) and (min-width:701px)').matches;   // 手機版地圖區高度固定，用整張塞進去
   const pd=2*(m.pad||0),vw=(m.vw??m.W-m.vx)+pd,vh=(m.vh??m.H-m.vy)+pd,fit=narrow?availW/vw:Math.min(availW/vw, availH/vh);
   const cs=Math.max(3,fit*state.zoom);
   svg.setAttribute('width',Math.round(vw*cs)); svg.setAttribute('height',Math.round(vh*cs));
@@ -996,7 +1046,9 @@ svg.addEventListener('pointerdown',ev=>{
   const h=ev.target.closest('[data-handle]');
   if(h){const z=zones().find(q=>q.id==h.dataset.handle);drag={kind:'resize',z,w:z.w,h:z.h};ev.preventDefault();return}
   const g=ev.target.closest('.zone');
-  if(g){const z=zones().find(q=>q.id==g.dataset.id);const c=toCell(ev);drag={kind:'move',z,ox:c.cx-z.x,oy:c.cy-z.y,x:z.x,y:z.y,moved:false,sx:ev.clientX,sy:ev.clientY};ev.preventDefault();return}
+  if(g){const z=zones().find(q=>q.id==g.dataset.id);const c=toCell(ev);drag={kind:'move',z,ox:c.cx-z.x,oy:c.cy-z.y,x:z.x,y:z.y,moved:false,sx:ev.clientX,sy:ev.clientY};
+    if(ev.pointerType==='touch'){const d=drag;d.lp=setTimeout(()=>{if(drag===d&&!d.moved){drag=null;showGhost(null);zoneMenu(z,d.sx,d.sy)}},550)}
+    ev.preventDefault();return}
   if(infoFunc){const c=toCell(ev);if(c){drag={kind:'draw',func:infoFunc,ax:c.cx,ay:c.cy,sx:ev.clientX,sy:ev.clientY,moved:false};ev.preventDefault();return}}
   const tg2=ev.target.closest('[data-tent]');
   if(tg2){const t=tents().find(q=>q.id==tg2.dataset.tent),c=toCell(ev);drag={kind:'tmove',t,ox:c.cx-t.x,oy:c.cy-t.y,moved:false,sx:ev.clientX,sy:ev.clientY};ev.preventDefault();return}
@@ -1045,7 +1097,7 @@ window.addEventListener('pointermove',ev=>{
   if(drag.kind==='pan'){const dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;if(Math.hypot(dx,dy)>4)drag.moved=true;wrap.scrollLeft=drag.sl-dx;wrap.scrollTop=drag.st-dy}
 });
 window.addEventListener('pointerup',ev=>{
-  if(!drag) return; const d=drag; drag=null; floating.hidden=true; showGhost(null);
+  if(!drag) return; const d=drag; if(d.lp)clearTimeout(d.lp); drag=null; floating.hidden=true; showGhost(null);
   if(d.kind.startsWith('ed')){edUp(ev,d);return}
   if(d.kind==='tent'){if(!d.moved){toast('在室外空地上拖曳，畫出帳篷的範圍');return}
     if(!tentOK(d.r)){toast(d.r.w<TENT_MIN||d.r.h<TENT_MIN?'帳篷至少 2 × 2 m':'帳篷要搭在室外空地或道路上，不能壓到其他東西');return}
@@ -1078,6 +1130,26 @@ window.addEventListener('pointerup',ev=>{
   if(d.kind==='resize'){const r={x:d.z.x,y:d.z.y,w:d.w,h:d.h}; if(canPlace(r,d.z.funcs,d.z.id)){d.z.w=d.w;d.z.h=d.h} else toast('這個大小放不下'); drawJoined(); return}
   if(d.kind==='pan'&&!d.moved&&mode==='layout'){ selected=null;infoFunc=null;selTent=null;drawZones() }
 });
+// 雙指縮放（手機／平板）：第二根手指放上來就取消單指動作，改成縮放，縮放中心跟著兩指中點
+const touches=new Map();let pinch=null;
+wrap.addEventListener('pointerdown',ev=>{if(ev.pointerType!=='touch')return;touches.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(touches.size===2){if(drag&&drag.lp)clearTimeout(drag.lp);drag=null;floating.hidden=true;showGhost(null);
+    const [a,b]=[...touches.values()],r=wrap.getBoundingClientRect(),mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
+    pinch={d0:Math.hypot(a.x-b.x,a.y-b.y),z0:state.zoom,w0:+svg.getAttribute('width'),fx:(wrap.scrollLeft+mx)/(+svg.getAttribute('width')),fy:(wrap.scrollTop+my)/(+svg.getAttribute('height')),mx,my}}},true);
+wrap.addEventListener('pointermove',ev=>{if(!touches.has(ev.pointerId))return;touches.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(!pinch||touches.size<2)return;const [a,b]=[...touches.values()];
+  state.zoom=Math.max(.5,Math.min(4,pinch.z0*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d0));applyZoom();
+  wrap.scrollLeft=pinch.fx*(+svg.getAttribute('width'))-pinch.mx;wrap.scrollTop=pinch.fy*(+svg.getAttribute('height'))-pinch.my},true);
+const endTouch=ev=>{touches.delete(ev.pointerId);if(pinch&&touches.size<2){pinch=null;drag=null;drawZones();save()}};
+wrap.addEventListener('pointerup',endTouch,true);wrap.addEventListener('pointercancel',endTouch,true);
+// 長按區塊的選單（觸控）：旋轉、刪除、擺器材
+function zoneMenu(z,x,y){selected=z.id;infoFunc=null;drawZones();const m=$('#zmenu');
+  m.innerHTML=`<b>${zoneLabel(z).join('＋')}</b><button type="button" data-a="items">擺器材／看說明</button><button type="button" data-a="rot">旋轉 90°</button><button type="button" data-a="del" class="danger">刪除區塊</button><button type="button" data-a="x">取消</button>`;
+  m.hidden=false;const w=m.offsetWidth,h=m.offsetHeight;m.style.left=Math.max(8,Math.min(innerWidth-w-8,x-w/2))+'px';m.style.top=Math.max(8,Math.min(innerHeight-h-8,y-h-16))+'px';
+  if(navigator.vibrate)try{navigator.vibrate(15)}catch(e){}}
+$('#zmenu').addEventListener('click',ev=>{const a=ev.target.closest('button')?.dataset.a;if(!a)return;$('#zmenu').hidden=true;
+  if(a==='items'){setMTab('side');return}if(a==='rot'||a==='del')$('#'+a)?.click()});
+document.addEventListener('pointerdown',ev=>{const m=$('#zmenu');if(!m.hidden&&!m.contains(ev.target))m.hidden=true},true);
 window.addEventListener('pointercancel',()=>{drag=null;floating.hidden=true;showGhost&&ghostLayer&&showGhost(null)});
 
 $('#info').addEventListener('click',ev=>{
@@ -2152,7 +2224,7 @@ function loop(now){
   if(now-lastPanel>250&&!sim.ended){lastPanel=now;renderInfo();renderSimBar()}
   if(mode==='sim') rafId=requestAnimationFrame(loop);
 }
-function endSim(){sim.ended=true;sim.running=false;if(!sim.lines.size)sim.showPat=sim.showStaff=true;alertLayer.innerHTML='';drawHeat();renderInfo();renderSimBar()}
+function endSim(){sim.ended=true;sim.running=false;if(!sim.lines.size)sim.showPat=sim.showStaff=true;alertLayer.innerHTML='';drawHeat();renderInfo();renderSimBar();if(isMobile())setMTab('side')}
 function stopSim(){
   cancelAnimationFrame(rafId); mode='layout'; sim=null; document.body.classList.remove('simming');
   if(agentLayer) agentLayer.innerHTML=''; if(alertLayer) alertLayer.innerHTML=''; if(heatLayer) heatLayer.innerHTML=''; if(fpLayer) fpLayer.innerHTML='';
@@ -2349,7 +2421,7 @@ function tutClose(){$('#tut').hidden=true;try{localStorage.setItem('mrs-tut-v1',
 $('#tutBtn').onclick=()=>{tutI=0;tutShow()};$('#tutSkip').onclick=tutClose;$('#tutNext').onclick=()=>{if(++tutI>=TUT.length)tutClose();else tutShow()};
 
 // 頂列
-function renderTabs(){$('#tabs').innerHTML=[...BUILTIN,{id:'custom',tab:'自訂場地'}].map(m=>`<button class="tab" role="tab" type="button" aria-selected="${m.id===state.mapId}" data-m="${m.id}">${m.tab}</button>`).join('')}
+function renderTabs(){const L=[...BUILTIN,{id:'custom',tab:'自訂場地'}];$('#mapSel').innerHTML=L.map(m=>`<option value="${m.id}"${m.id===state.mapId?' selected':''}>${m.tab}</option>`).join('');$('#tabs').innerHTML=[...BUILTIN,{id:'custom',tab:'自訂場地'}].map(m=>`<button class="tab" role="tab" type="button" aria-selected="${m.id===state.mapId}" data-m="${m.id}">${m.tab}</button>`).join('')}
 $('#tabs').addEventListener('click',ev=>{const b=ev.target.closest('.tab');if(!b)return;if(mode==='sim')stopSim();state.mapId=b.dataset.m;if(state.mapId==='custom'&&!state.custom){newCustom();rebuildCustom()}selected=null;infoFunc=null;selTent=null;selTape=null;tentMode=false;tapeMode=false;edMeasure=null;edUndo=[];renderTabs();drawBase();drawZones();applyZoom()});
 const hasXray=m=>m.g.some(r=>r.includes('X'));
 function renderRad(){const b=$('#radBtn');if(!b)return;b.hidden=!hasXray(map());b.classList.toggle('on',!!state.rad);b.setAttribute('aria-pressed',String(!!state.rad))}
@@ -2372,6 +2444,12 @@ $('#clearMap').onclick=ev=>{
   clearArmed=false;ev.target.textContent='清空本圖';state.layouts[LK(state.mapId)]=[];state.tapes[LK(state.mapId)]=[];state.tents[LK(state.mapId)]=[];selected=null;selTape=null;selTent=null;refreshGrid(map());drawBase();drawZones();toast('已清空');
 };
 window.addEventListener('resize',()=>applyZoom());
+// 手機版：場地下拉、⋯ 選單、下方抽屜分頁
+$('#mapSel').onchange=e=>$('#tabs').querySelector(`[data-m="${e.target.value}"]`)?.click();
+$('#moreBtn').onclick=()=>{const o=document.body.classList.toggle('more');$('#moreBtn').setAttribute('aria-expanded',o);applyZoom()};
+const isMobile=()=>window.matchMedia('(max-width:700px)').matches;
+function setMTab(t){document.body.classList.toggle('mt-side',t==='side');$('#mtabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===t))}
+$('#mtabs').onclick=e=>{const b=e.target.closest('button');if(b)setMTab(b.dataset.t)};
 // 配色：預設白底；選擇記在本機，和佈置資料分開
 const isDark=()=>document.documentElement.dataset.theme==='dark';
 function setTheme(t){const r=document.documentElement;if(t==='dark')r.dataset.theme='dark';else delete r.dataset.theme;
